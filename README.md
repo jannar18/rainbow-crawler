@@ -1,4 +1,4 @@
-# Compound Engineering System
+# Intro to Compound Engineering
 
 A workflow system for Claude Code that makes each unit of engineering work make the next one easier.
 
@@ -37,7 +37,10 @@ brainstorm → plan → work → review → compound → feeds back into future 
 ├── subagents/                   # Specialist agents spawned by workflows
 │   ├── repo-research-analyst.md   # Scans codebase for patterns (used by brainstorm, plan)
 │   ├── learnings-researcher.md    # Searches docs/solutions/ for past learnings (used by plan, review)
-│   └── code-simplicity-reviewer.md # Flags over-engineering and YAGNI violations (used by review)
+│   ├── code-simplicity-reviewer.md # Flags over-engineering and YAGNI violations (used by review)
+│   ├── best-practices-researcher.md # Researches external best practices and docs (used by plan)
+│   ├── framework-docs-researcher.md # Gathers framework/library documentation (used by plan)
+│   └── spec-flow-analyzer.md       # Analyzes specs for flow gaps and edge cases (used by plan)
 └── skills/                      # Reusable process knowledge
     ├── brainstorming/SKILL.md     # Question techniques, approach exploration
     ├── document-review/SKILL.md   # Structured document refinement
@@ -75,6 +78,9 @@ Agents are specialist subprocesses that get spawned by the workflow commands. Th
 | `repo-research-analyst` | brainstorm, plan | Scans the codebase for existing patterns and conventions |
 | `learnings-researcher` | plan, review | Searches `docs/solutions/` for relevant past problems and solutions |
 | `code-simplicity-reviewer` | review | Reviews code for unnecessary complexity, YAGNI violations |
+| `best-practices-researcher` | plan | Researches external best practices, industry standards, and community conventions |
+| `framework-docs-researcher` | plan | Gathers official documentation and version-specific guidance for libraries and frameworks |
+| `spec-flow-analyzer` | plan | Analyzes specs for user flow completeness, edge cases, and missing requirements |
 
 ### Skills
 
