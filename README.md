@@ -9,10 +9,7 @@ The idea: when you solve a problem, document it. When you plan a feature, check 
 There are 5 workflow commands that form a pipeline. You don't have to use all of them, and you don't have to use them in order, but they're designed to flow into each other:
 
 ```
-brainstorm → plan → work → review → compound
-                                        |
-                        feeds back into ─┘
-                        future plans & reviews
+brainstorm → plan → work → review → compound → feeds back into future plans & reviews
 ```
 
 ### The Pipeline
