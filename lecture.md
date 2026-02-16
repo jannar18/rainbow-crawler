@@ -196,7 +196,7 @@ Every action the model takes **fills the window**:
 
 ```mermaid
 graph RL
-    S["🔍 Searching for files"] --> CW["📦 Context Window\n~170k tokens"]
+    S["🔍 Searching for files"] --> CW["📦 Context Window<br/>~170k tokens"]
     U["📖 Reading & understanding code"] --> CW
     E["✏️ Applying edits"] --> CW
     T["🧪 Test & build logs"] --> CW
@@ -219,7 +219,7 @@ graph LR
         A["🔍🔍🔍📖📖✏️🧪❌🧪✅"]
     end
     subgraph After
-        B["📄 Clear summary of findings,\nstatus, and next steps"]
+        B["📄 Clear summary of findings,<br/>status, and next steps"]
     end
     Before -->|compact| After
 ```
@@ -238,8 +238,8 @@ A sub-agent gets its own **fresh context window** to search, read, and explore �
 
 ```mermaid
 graph TD
-    P["🧠 Parent Agent\n(clean context)"] -->|"go find X"| S["🔍 Sub-Agent\n(fresh context window)"]
-    S -->|"here's what I found\n(structured summary)"| P
+    P["🧠 Parent Agent<br/>(clean context)"] -->|"go find X"| S["🔍 Sub-Agent<br/>(fresh context window)"]
+    S -->|"here's what I found<br/>(structured summary)"| P
 ```
 
 The parent stays clean. The sub-agent does the messy work and returns a **compacted result**.
@@ -342,7 +342,7 @@ graph TD
     A1 -->|compacted findings| P
     A2 -->|compacted findings| P
     A3 -->|compacted findings| P
-    P --> PLAN["📄 Implementation plan\nwith exact steps"]
+    P --> PLAN["📄 Implementation plan<br/>with exact steps"]
 ```
 
 **Principles: sub-agents + compaction.** The parent context stays clean. Research gets distilled into a structured plan.
@@ -379,7 +379,7 @@ Claude reads the plan and works through it **step by step**.
 graph LR
     S["🧠 Solved a problem"] --> D["📄 Document it"]
     D --> K["📚 Knowledge base"]
-    K -->|"learnings-researcher\nfinds it next time"| FP["📋 Future plans"]
+    K -->|"learnings-researcher<br/>finds it next time"| FP["📋 Future plans"]
 ```
 
 **Principle: compounding knowledge.** The first time you solve a problem, it's research. The second time, it's a lookup.
