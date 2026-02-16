@@ -10,6 +10,8 @@ const GAME_KEYS = new Set([
   "KeyS",
   "KeyD",
   "Space",
+  "ShiftLeft",
+  "ShiftRight",
 ]);
 
 export class Input {

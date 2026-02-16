@@ -10,16 +10,16 @@ brainstorm: docs/brainstorms/2026-02-16-dungeon-crawler-brainstorm.md
 
 ## Overview
 
-A medium-scope grid-based dungeon crawler built on the existing Snake game scaffold. The player explores procedurally generated rooms on a 20x20 grid (32px native sprites, 640x640 canvas) using keyboard-only controls (WASD + spacebar), heals corrupted enemies with rainbow beams, and progresses through rooms to reach and heal a final boss. Each room is a full 20x20 screen (Zelda NES-style transitions).
+A medium-scope grid-based dungeon crawler built on the existing Snake game scaffold. The player explores procedurally generated rooms on a 20x20 grid (32px native sprites, 640x640 canvas) using keyboard-only controls (WASD + spacebar + Shift to sprint), heals corrupted enemies with rainbow beams, and progresses through rooms to reach and heal a final boss. Each room is a full 20x20 screen (Zelda NES-style transitions).
 
-**Core experience:** WASD movement + spacebar to shoot rainbow beams in facing direction, healing corrupted enemies through a two-stage death (calm then rainbow dissolve), filling a rainbow power bar to weaken and ultimately heal the boss. Sprite-based visuals using 32px PNG assets loaded via PixiJS.
+**Core experience:** WASD movement (Shift to sprint) + spacebar to shoot rainbow beams in facing direction, healing corrupted enemies through a two-stage death (calm then rainbow dissolve), filling a rainbow power bar to weaken and ultimately heal the boss. Sprite-based visuals using 32px PNG assets loaded via PixiJS.
 
 ## Motivation
 
 Extends all three layers of the scaffold architecture:
 
 1. **New Scene logic** — player, enemies, projectiles, rooms, collision, AI, win/lose states
-2. **Engine Input extension** — add Enter key to GAME_KEYS whitelist
+2. **Engine Input extension** — add Shift keys to GAME_KEYS whitelist (sprint modifier)
 3. **Engine Renderer extension** — add sprite drawing, progress bars, and alpha-blended rectangles
 
 ## Proposed Solution
@@ -47,7 +47,7 @@ The scene manages all state internally. Room transitions swap which room's data 
 
 | Decision | Choice | Reasoning |
 |----------|--------|-----------|
-| Controls | Keyboard-only (WASD + spacebar) | More accessible, no engine mouse extension needed |
+| Controls | Keyboard-only (WASD + spacebar + Shift sprint) | More accessible, no engine mouse extension needed |
 | Enemy types | Chaser + Ranger | Chaser moves toward player; Ranger is static, shoots at player |
 | Dungeon layout | Room-per-screen | Each room is the full 20x20 grid. Doors at edges transition to next room |
 | Ammo | Unlimited | No softlock risk, focus on combat skill not resource management |
@@ -63,16 +63,16 @@ The scene manages all state internally. Room transitions swap which room's data 
 
 ### Engine Extensions
 
-#### `Input.ts` — Add Enter key
+#### `Input.ts` — Add Shift keys (sprint modifier)
 
-Add `"Enter"` to the `GAME_KEYS` set so `preventDefault()` fires. The scene already receives all key codes, but Enter should be in the whitelist for completeness. Spacebar is already included.
+Add `"ShiftLeft"` and `"ShiftRight"` to the `GAME_KEYS` set so `preventDefault()` fires for the sprint modifier. The scene already receives all key codes, but Shift should be in the whitelist for completeness.
 
 ```typescript
 // src/engine/Input.ts — add to GAME_KEYS
 const GAME_KEYS = new Set([
   "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
   "KeyW", "KeyA", "KeyS", "KeyD",
-  "Space", "Enter",  // ← add Enter
+  "Space", "ShiftLeft", "ShiftRight",  // ← add Shift for sprint
 ]);
 ```
 
@@ -192,11 +192,12 @@ win → (press Space) → start
 | Health | 5 HP | Start value; max 5 |
 | Speed | 1 cell/tick | Moves on every tick when key held |
 | Facing | 4 directions (up/down/left/right) | Set by last movement direction; starts facing right |
-| Shoot | Spacebar or Enter | Fires rainbow beam in facing direction |
+| Shoot | Spacebar | Fires rainbow beam in facing direction |
+| Sprint | Hold Shift | Moves 2 cells/tick instead of 1 (double speed) |
 | Fire rate | 1 beam per 3 ticks (~450ms cooldown) | Prevents beam spam |
 | Invincibility frames | 4 ticks (~600ms) after taking damage | Prevents multi-hit stunlock |
 
-**Movement model:** Hold WASD to move. Each tick, if a movement key is held, move 1 cell in that direction (if not blocked by wall). This requires tracking held keys via `onKeyDown`/`onKeyUp` flags, checked in `update()`.
+**Movement model:** Hold WASD to move. Each tick, if a movement key is held, move 1 cell in that direction (if not blocked by wall). Hold Shift to sprint at 2 cells/tick — check both intermediate cells for wall collision (same approach as beam collision). This requires tracking held keys via `onKeyDown`/`onKeyUp` flags (including Shift state), checked in `update()`.
 
 ### Projectiles
 
@@ -302,7 +303,7 @@ Cleared rooms remain cleared if the player backtracks.
 Each `update(dt)` call processes in this order:
 
 ```
-1. Process input flags → update player position + spawn beam if shooting
+1. Process input flags → update player position (1 or 2 cells if sprinting, checking each) + spawn beam if shooting
 2. Move player projectiles (2 cells, checking each)
 3. Move enemy projectiles (1 cell)
 4. Move enemies (Chasers pathfind, Rangers stay put)
@@ -339,6 +340,7 @@ interface Player {
   maxHealth: number;
   iFrames: number;        // invincibility ticks remaining
   shootCooldown: number;  // ticks until can fire again
+  sprinting: boolean;     // true when Shift held — moves 2 cells/tick
 }
 
 interface Enemy {
@@ -387,7 +389,7 @@ src/
 │   ├── types.ts        # Update constants (32px/640px), extend Renderer interface
 │   ├── Game.ts         # No changes needed
 │   ├── Renderer.ts     # Add drawSprite, drawBar, drawRectAlpha, static/dynamic layers
-│   └── Input.ts        # Add "Enter" to GAME_KEYS
+│   └── Input.ts        # Add "ShiftLeft"/"ShiftRight" to GAME_KEYS
 ├── scenes/
 │   ├── SnakeScene.ts   # Unchanged (keep as reference)
 │   └── DungeonCrawlerScene.ts  # New: all dungeon crawler logic
@@ -419,23 +421,24 @@ All game logic lives in `DungeonCrawlerScene.ts`. Utility types/interfaces defin
 
 **Tasks:**
 
-- [ ] Update constants in `src/engine/types.ts` (CELL_SIZE=32, CANVAS=640x640)
-- [ ] Update `Renderer` interface in `src/engine/types.ts` with new method signatures
-- [ ] Add `"Enter"` to `GAME_KEYS` in `src/engine/Input.ts`
-- [ ] Add `drawSprite()`, `drawBar()`, `drawRectAlpha()` to `src/engine/Renderer.ts`
-- [ ] Add static/dynamic two-layer rendering to `src/engine/Renderer.ts`
+- [x] Update constants in `src/engine/types.ts` (CELL_SIZE=32, CANVAS=640x640)
+- [x] Update `Renderer` interface in `src/engine/types.ts` with new method signatures
+- [x] Add `"ShiftLeft"` and `"ShiftRight"` to `GAME_KEYS` in `src/engine/Input.ts`
+- [x] Add `drawSprite()`, `drawBar()`, `drawRectAlpha()` to `src/engine/Renderer.ts`
+- [x] Add static/dynamic two-layer rendering to `src/engine/Renderer.ts`
 - [ ] Create placeholder 32px PNG sprites in `public/sprites/` (player, wall, floor, door, beam)
 - [ ] Set up asset preloading in `src/main.ts` via PixiJS `Assets`
-- [ ] Create `src/scenes/DungeonCrawlerScene.ts` with game state machine (start/playing/gameOver/win)
-- [ ] Implement player movement (WASD, held-key tracking via `onKeyDown`/`onKeyUp` flags)
-- [ ] Implement facing direction (player sprite or visual indicator for current direction)
-- [ ] Implement wall collision (player cannot move into wall cells)
-- [ ] Implement rainbow beam shooting (spacebar/enter, fires in facing direction, 2 cells/tick)
-- [ ] Implement beam collision with walls (despawn on hit)
-- [ ] Create one hand-designed test room (walls, open area, doors)
-- [ ] Render floor, walls, player, and beams using sprites
-- [ ] Update `src/main.ts` to preload assets and load `DungeonCrawlerScene`
-- [ ] Start/playing state transitions (Space to begin)
+- [x] Create `src/scenes/DungeonCrawlerScene.ts` with game state machine (start/playing/gameOver/win)
+- [x] Implement player movement (WASD, held-key tracking via `onKeyDown`/`onKeyUp` flags)
+- [x] Implement facing direction (player sprite or visual indicator for current direction)
+- [x] Implement wall collision (player cannot move into wall cells)
+- [x] Implement rainbow beam shooting (spacebar, fires in facing direction, 2 cells/tick)
+- [x] Implement sprint mechanic (hold Shift to move 2 cells/tick, check both cells for wall collision)
+- [x] Implement beam collision with walls (despawn on hit)
+- [x] Create one hand-designed test room (walls, open area, doors)
+- [x] Render floor, walls, player, and beams using colored rectangles (sprites deferred to Phase 4)
+- [x] Update `src/main.ts` to preload assets and load `DungeonCrawlerScene`
+- [x] Start/playing state transitions (Space to begin)
 
 **Success criteria:** Player can move around a sprite-rendered room, shoot beams that travel and hit walls. Feels responsive. Sprites render crisp at 1:1.
 
@@ -520,7 +523,8 @@ All game logic lives in `DungeonCrawlerScene.ts`. Utility types/interfaces defin
 ### Functional Requirements
 
 - [ ] Player moves with WASD on a 20x20 grid, blocked by walls
-- [ ] Player shoots rainbow beams with spacebar/enter in their facing direction
+- [ ] Player shoots rainbow beams with spacebar in their facing direction
+- [ ] Player can hold Shift to sprint (2 cells/tick instead of 1)
 - [ ] Beams travel at 2 cells/tick and stop at walls or enemies
 - [ ] Chaser enemies pathfind toward the player
 - [ ] Ranger enemies shoot at the player when they have line of sight
