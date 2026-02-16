@@ -34,7 +34,9 @@ Then, in Claude Code:
 2. `/workflows:plan` — let Claude research the codebase and create an implementation plan
 3. **Review the plan** — read it, make sure the approach makes sense
 4. `/workflows:work` — execute the plan
+5. `/workflows:review` — run a multi-agent code review on your changes
+6. `/workflows:compound` — document what you learned so future plans get smarter
 
 While Claude is working on a long step, open a new terminal tab and start another Claude conversation — ask questions about the workflow system, explore the code, think about your design.
 
-Iterate as needed: review, compound what you learn, keep going.
+Iterate as needed. Each cycle through the pipeline makes the next one better.
