@@ -448,18 +448,18 @@ All game logic lives in `DungeonCrawlerScene.ts`. Utility types/interfaces defin
 
 **Tasks:**
 
-- [ ] Implement Chaser enemy (BFS pathfinding toward player, moves every 2 ticks)
-- [ ] Implement Ranger enemy (static, line-of-sight check, fires every 5 ticks)
-- [ ] Implement enemy projectiles (Ranger shots, 1 cell/tick, damages player)
-- [ ] Implement beam-enemy collision (beam hits enemy, reduces heal counter)
-- [ ] Implement two-stage healing death (calm phase 6 ticks → dissolve phase 4 ticks → removed)
-- [ ] Implement player health and damage (contact damage from Chasers, projectile damage from Rangers)
-- [ ] Implement invincibility frames (4 ticks after taking damage)
-- [ ] Implement shoot cooldown (1 beam per 3 ticks)
-- [ ] Implement tick resolution order (movement → projectiles → AI → collision → effects → cleanup)
-- [ ] Implement health HUD (player health bar)
-- [ ] Implement game over state (health reaches 0)
-- [ ] Place enemies in the test room for combat testing
+- [x] Implement Chaser enemy (BFS pathfinding toward player, moves every 2 ticks)
+- [x] Implement Ranger enemy (static, line-of-sight check, fires every 5 ticks)
+- [x] Implement enemy projectiles (Ranger shots, 1 cell/tick, damages player)
+- [x] Implement beam-enemy collision (beam hits enemy, reduces heal counter)
+- [x] Implement two-stage healing death (calm phase 6 ticks → dissolve phase 4 ticks → removed)
+- [x] Implement player health and damage (contact damage from Chasers, projectile damage from Rangers)
+- [x] Implement invincibility frames (4 ticks after taking damage)
+- [x] Implement shoot cooldown (1 beam per 3 ticks)
+- [x] Implement tick resolution order (movement → projectiles → AI → collision → effects → cleanup)
+- [x] Implement health HUD (player health bar)
+- [x] Implement game over state (health reaches 0)
+- [x] Place enemies in the test room for combat testing
 - [ ] Tune tick rate if 150ms feels too slow for combat
 
 **Success criteria:** Player can fight Chasers and Rangers. Enemies heal with the two-stage death animation. Player can die. Combat feels fair.
