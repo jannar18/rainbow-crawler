@@ -564,7 +564,6 @@ export class DungeonCrawlerScene implements Scene {
   private healedEnemies = 0;
 
   init(_context: GameContext): void {
-    this.dungeon = generateDungeon();
     this.resetGame();
   }
 
@@ -937,20 +936,18 @@ export class DungeonCrawlerScene implements Scene {
     if (enemy.shootCooldown > 0) return;
     enemy.shootCooldown = BOSS_FIRE_INTERVAL;
 
-    // Boss fires 3-directional spread: picks closest cardinal to player + adjacent cardinals
+    // Boss fires 3-directional spread: picks most-aligned cardinal to player + adjacent cardinals
     const dirs: Direction[] = ["up", "down", "left", "right"];
     let bestDir: Direction = "down";
-    let bestDist = Infinity;
+    let bestAlignment = 0;
 
     for (const dir of dirs) {
       const d = DELTA[dir];
-      // Distance along this direction to player
       const dx = this.player.pos.x - enemy.pos.x;
       const dy = this.player.pos.y - enemy.pos.y;
       const alignment = dx * d.x + dy * d.y; // dot product
-      const dist = Math.abs(dx) + Math.abs(dy);
-      if (alignment > 0 && dist < bestDist) {
-        bestDist = dist;
+      if (alignment > bestAlignment) {
+        bestAlignment = alignment;
         bestDir = dir;
       }
     }

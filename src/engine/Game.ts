@@ -39,12 +39,14 @@ export class Game {
     if (this.scene) {
       this.input.setScene(null);
       this.scene.destroy();
+      this.renderer.clear();
+      this.renderer.clearStatic();
     }
 
     this.scene = scene;
     this.errorMessage = null;
-    this.input.setScene(scene);
     scene.init(this.context);
+    this.input.setScene(scene);
 
     if (!this.running) {
       this.running = true;
@@ -86,7 +88,9 @@ export class Game {
   }
 
   private renderError(message: string): void {
-    this.app.stage.removeChildren();
+    for (const child of this.app.stage.removeChildren()) {
+      child.destroy();
+    }
 
     const bg = new Graphics();
     bg.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -119,5 +123,7 @@ export class Game {
     body.x = 20;
     body.y = 60;
     this.app.stage.addChild(body);
+
+    this.running = false;
   }
 }
