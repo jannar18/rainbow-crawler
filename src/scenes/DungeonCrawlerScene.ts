@@ -212,7 +212,7 @@ export class DungeonCrawlerScene implements Scene {
 
   private resetGame(): void {
     this.player = {
-      pos: { x: 10, y: 10 },
+      pos: { x: 10, y: 7 },
       facing: "right",
       health: PLAYER_MAX_HEALTH,
       maxHealth: PLAYER_MAX_HEALTH,
