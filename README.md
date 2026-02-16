@@ -19,7 +19,7 @@ Before you start building, get familiar with both:
 
 **Transform the Snake game into a completely different game using the compound engineering workflow.**
 
-Be as ambitious as you want. Breakout, Asteroids, a platformer, a puzzle game, a roguelike — whatever you're excited about. The engine handles the game loop, rendering, and input. Your job is to replace the game logic.
+Be as ambitious as you want. Breakout, Asteroids, a platformer, a puzzle game, a roguelike — whatever you're excited about. The engine handles the game loop, rendering, and input out of the box — leave it as-is if it suits your needs, or modify it if your game calls for something different.
 
 ## How to start
 

@@ -6,7 +6,7 @@ component: Scene-based architecture (Scene interface, Game loop, Renderer, Input
 symptoms:
   - "Need for reusable game engine scaffold to teach architecture patterns"
   - "Separation of concerns between engine layer and game logic layer not well documented"
-  - "Students need clear boundaries for engine stability vs game scene customization"
+  - "Students need clear starting architecture to understand before customizing"
 root_cause: "Lack of documented architectural pattern for scene-based game engines that can serve as a teaching tool and reusable scaffold"
 resolution_type: documentation_update
 severity: medium
@@ -26,7 +26,7 @@ Students learning game development with TypeScript need a starting point that is
 
 ## Symptoms
 - No reusable scaffold existed for teaching scene-based game architecture
-- Students had no clear boundary between "what to keep" and "what to replace"
+- Students had no clear starting architecture to learn from before building their own
 - Game engine tutorials conflated engine logic with game logic
 
 ## What Didn't Work
@@ -40,9 +40,9 @@ Students learning game development with TypeScript need a starting point that is
 
 ## Solution
 
-A **scene-based engine scaffold** with strict separation: engine (`src/engine/`) stays stable, game (`src/scenes/`) gets replaced.
+A **scene-based engine scaffold** with clear separation: engine (`src/engine/`) provides the starting infrastructure, game (`src/scenes/`) contains game logic. Students can modify either layer.
 
-### The Scene Interface (the only contract)
+### The Scene Interface (the default contract)
 
 ```typescript
 // src/engine/types.ts
@@ -101,7 +101,7 @@ try {
 ### File Structure
 
 ```
-src/engine/   → types.ts, Game.ts, Renderer.ts, Input.ts (keep stable)
+src/engine/   → types.ts, Game.ts, Renderer.ts, Input.ts (starting infrastructure)
 src/scenes/   → SnakeScene.ts (replace with your game)
 src/main.ts   → Entry point (change import to load your scene)
 ```
@@ -116,11 +116,10 @@ src/main.ts   → Entry point (change import to load your scene)
 
 ## Prevention
 
-- **Enforce the Scene interface as the single contract.** Don't expose engine internals to scenes. Any new features go through `Renderer` or `GameContext`.
+- **Understand the Scene interface before modifying it.** It's the starting contract between engine and game. Modify it deliberately if your game needs different behavior.
 - **Always call `destroy()` when switching scenes.** Scenes must clean up PixiJS children to prevent memory leaks and ghost artifacts.
-- **Document the fixed-timestep contract clearly.** Students must understand `dt` is always 0.15s. Warn against using `Date.now()` inside scenes — it breaks determinism.
-- **Keep the Renderer API minimal.** Resist adding game-specific convenience methods. Use the `stage` escape hatch for advanced rendering.
-- **Prevent engine modifications.** Make separation explicit in docs. Students should only touch `src/scenes/` and the import in `main.ts`.
+- **Understand the fixed-timestep design.** The default `dt` is always 0.15s. Using `Date.now()` inside scenes breaks determinism — change the tick rate in the engine if you need different timing.
+- **Extend the Renderer deliberately.** Add methods to `Renderer` if your game needs them, rather than working around it from the scene side.
 - **Guard input handling.** `onKeyDown`/`onKeyUp` are synchronous — don't block or throw. Use flags and apply changes in `update()`.
 - **Monitor accumulator clamping.** `MAX_ACCUMULATOR_MS = 1000` prevents tab-inactive death spirals. Document why it exists.
 

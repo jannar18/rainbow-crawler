@@ -15,8 +15,8 @@ Open http://localhost:5173 and play Snake with arrow keys or WASD.
 
 The project has two layers:
 
-- **Engine** (`src/engine/`) — Game loop, renderer, input handling. You keep this as-is.
-- **Game** (`src/scenes/SnakeScene.ts`) — The Snake game. You replace this file.
+- **Engine** (`src/engine/`) — Game loop, renderer, input handling. Works out of the box; modify if your game needs it.
+- **Game** (`src/scenes/SnakeScene.ts`) — The Snake game. Replace this with your own Scene.
 
 To create your own game:
 

@@ -50,8 +50,8 @@ class MyScene implements Scene {
 }
 ```
 
-**Why:** The Scene interface is the only contract between engine and game layer. Bypassing it (importing engine internals, using Date.now() instead of fixed dt, accessing PixiJS directly) breaks the architecture and makes the engine unstable. Students should only modify files in `src/scenes/` and the import in `src/main.ts`.
+**Why:** The Scene interface is the default contract between engine and game layer. When working within this contract, use it properly (get config from GameContext, use fixed dt, draw through Renderer). Bypassing it unintentionally (e.g., using Date.now() instead of fixed dt) leads to bugs. However, students are free to modify the engine layer if their game needs different behavior.
 
-**Placement/Context:** Applies whenever creating a new Scene implementation or modifying game logic. The engine layer (`src/engine/`) should never be modified.
+**Placement/Context:** Applies whenever creating a new Scene implementation. If the engine needs changes, modify it deliberately rather than working around it from the scene side.
 
 **Documented in:** `docs/solutions/best-practices/scene-based-game-engine-architecture-20260215.md`

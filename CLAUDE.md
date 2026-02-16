@@ -1,12 +1,12 @@
 # Snake Game Teaching Scaffold
 
-A Vite + TypeScript + PixiJS v8 project designed as a starting point for game development. Students keep the engine layer stable and replace the game layer (SnakeScene) with their own game.
+A Vite + TypeScript + PixiJS v8 project designed as a starting point for game development. Students replace the game layer (SnakeScene) with their own game and can modify the engine layer as needed.
 
 ## Architecture
 
 Two layers separated by the `Scene` interface:
 
-- **Engine layer** (`src/engine/`) — Game loop, renderer, input. Students do NOT modify these files.
+- **Engine layer** (`src/engine/`) — Game loop, renderer, input. Can be extended or modified as needed.
 - **Game layer** (`src/scenes/`) — Game logic. Students replace `SnakeScene.ts` with their own Scene implementation.
 
 ```
@@ -25,7 +25,7 @@ src/
 
 ## Scene Interface
 
-Every game implements this contract (defined in `src/engine/types.ts`):
+The default contract between engine and game (defined in `src/engine/types.ts`):
 
 ```ts
 interface Scene {
@@ -71,9 +71,10 @@ Defined in `src/engine/types.ts`:
 1. Create a new file in `src/scenes/` (e.g., `AsteroidsScene.ts`)
 2. Implement the `Scene` interface
 3. Update `src/main.ts` to import and load your scene instead of `SnakeScene`
-4. Run `npm run dev` to test
+4. Modify the engine layer (`src/engine/`) if your game needs different rendering, input, or loop behavior
+5. Run `npm run dev` to test
 
-The engine handles the game loop, rendering pipeline, and keyboard input. Your scene just implements game logic and drawing.
+The engine provides a working game loop, renderer, and input system out of the box. You can use it as-is or modify it to fit your game's needs.
 
 ## Commands
 
