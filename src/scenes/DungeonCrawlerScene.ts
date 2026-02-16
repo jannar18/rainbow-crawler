@@ -41,7 +41,7 @@ type Direction = "up" | "down" | "left" | "right";
 type CellType = "wall" | "floor" | "door";
 type GameState = "start" | "playing" | "gameOver" | "win";
 type EnemyType = "chaser" | "ranger" | "boss";
-type EnemyState = "active" | "calm" | "dissolving";
+type EnemyState = "active" | "calm" | "dissolving" | "healed";
 type PlayerCharacter = "fairy" | "wizard";
 
 const GNOLL_VARIANTS = ["gnollbrute", "gnollshaman", "gnollscout"] as const;
@@ -50,6 +50,7 @@ const ELF_GENDERS = ["elf_f", "elf_m"] as const;
 interface Player {
   pos: Point;
   facing: Direction;
+  aimDirection: Direction;
   health: number;
   maxHealth: number;
   iFrames: number;
@@ -149,15 +150,19 @@ const ENTITY_SCALE = 1.4;
 
 // --- Key mappings ---
 
-const KEY_DIRECTION: Record<string, Direction> = {
-  ArrowUp: "up",
-  ArrowDown: "down",
-  ArrowLeft: "left",
-  ArrowRight: "right",
+// WASD = movement, Arrows = aim
+const MOVE_KEY_DIRECTION: Record<string, Direction> = {
   KeyW: "up",
   KeyS: "down",
   KeyA: "left",
   KeyD: "right",
+};
+
+const AIM_KEY_DIRECTION: Record<string, Direction> = {
+  ArrowUp: "up",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
 };
 
 // --- Animation helper ---
@@ -590,6 +595,7 @@ export class DungeonCrawlerScene implements Scene {
     this.player = {
       pos: { ...this.dungeon.rooms[0].playerSpawn },
       facing: "right",
+      aimDirection: "right",
       health: PLAYER_MAX_HEALTH,
       maxHealth: PLAYER_MAX_HEALTH,
       iFrames: 0,
@@ -702,19 +708,18 @@ export class DungeonCrawlerScene implements Scene {
     }
     this.updateEnemyTimers();
 
-    // --- 8. Remove dissolved enemies, update rainbow power ---
-    this.room.enemies = enemies.filter((e) => {
+    // --- 8. Transition dissolved enemies to healed, update rainbow power ---
+    for (const e of enemies) {
       if (e.state === "dissolving" && e.stateTimer <= 0) {
+        e.state = "healed";
         this.healedEnemies++;
         if (this.dungeon.totalEnemies > 0) {
           this.rainbowPower = Math.min(1, this.healedEnemies / this.dungeon.totalEnemies);
         }
-        return false;
       }
-      return true;
-    });
+    }
 
-    if (this.room.enemies.length === 0) {
+    if (this.room.enemies.every((e) => e.state === "healed")) {
       this.room.cleared = true;
     }
 
@@ -762,10 +767,10 @@ export class DungeonCrawlerScene implements Scene {
     let dx = 0;
     let dy = 0;
 
-    if (this.heldKeys.has("KeyW") || this.heldKeys.has("ArrowUp")) dy -= 1;
-    if (this.heldKeys.has("KeyS") || this.heldKeys.has("ArrowDown")) dy += 1;
-    if (this.heldKeys.has("KeyA") || this.heldKeys.has("ArrowLeft")) dx -= 1;
-    if (this.heldKeys.has("KeyD") || this.heldKeys.has("ArrowRight")) dx += 1;
+    if (this.heldKeys.has("KeyW")) dy -= 1;
+    if (this.heldKeys.has("KeyS")) dy += 1;
+    if (this.heldKeys.has("KeyA")) dx -= 1;
+    if (this.heldKeys.has("KeyD")) dx += 1;
 
     return { dx, dy };
   }
@@ -779,14 +784,14 @@ export class DungeonCrawlerScene implements Scene {
   // --- Projectile logic ---
 
   private spawnBeam(): void {
-    const delta = DELTA[this.player.facing];
+    const delta = DELTA[this.player.aimDirection];
     const startX = this.player.pos.x + delta.x;
     const startY = this.player.pos.y + delta.y;
     if (!this.isWalkable(startX, startY)) return;
 
     this.projectiles.push({
       pos: { x: startX, y: startY },
-      direction: this.player.facing,
+      direction: this.player.aimDirection,
       speed: BEAM_SPEED,
       isPlayerBeam: true,
     });
@@ -1177,6 +1182,10 @@ export class DungeonCrawlerScene implements Scene {
           enemy.pos.x, enemy.pos.y, frame, sc, alpha,
           RAINBOW_COLORS[colorIdx]
         );
+      } else if (enemy.state === "healed") {
+        // Friendly healed sprite, gentle idle animation
+        const frame = this.getEnemyHealedTexture(enemy);
+        renderer.drawSpriteScaled(enemy.pos.x, enemy.pos.y, frame, sc, 0.85);
       }
     }
 
@@ -1373,7 +1382,7 @@ export class DungeonCrawlerScene implements Scene {
       color: COLOR_UI_DIM,
       anchor: 0.5,
     });
-    renderer.drawText("WASD: Move  |  HOLD SPACE: Shoot  |  SHIFT: Sprint", cx, 428, {
+    renderer.drawText("WASD: Move  |  Arrows: Aim  |  SPACE: Shoot  |  SHIFT: Sprint", cx, 428, {
       fontSize: 11,
       color: COLOR_UI_DIM,
       anchor: 0.5,
@@ -1407,7 +1416,7 @@ export class DungeonCrawlerScene implements Scene {
       anchor: 0.5,
     });
 
-    renderer.drawText("Press SPACE to retry", cx, 400, {
+    renderer.drawText("Press SPACE to return", cx, 400, {
       fontSize: 22,
       color: COLOR_UI_TEXT,
       anchor: 0.5,
@@ -1449,7 +1458,7 @@ export class DungeonCrawlerScene implements Scene {
       anchor: 0.5,
     });
 
-    renderer.drawText("Press SPACE to play again", cx, 410, {
+    renderer.drawText("Press SPACE to return", cx, 410, {
       fontSize: 22,
       color: COLOR_UI_TEXT,
       anchor: 0.5,
@@ -1477,14 +1486,19 @@ export class DungeonCrawlerScene implements Scene {
       return;
     }
 
-    if (KEY_DIRECTION[key] && !this.heldKeys.has("Space")) {
-      this.player.facing = KEY_DIRECTION[key];
+    if (MOVE_KEY_DIRECTION[key]) {
+      this.player.facing = MOVE_KEY_DIRECTION[key];
+      this.player.aimDirection = MOVE_KEY_DIRECTION[key];
+    }
+    if (AIM_KEY_DIRECTION[key]) {
+      this.player.aimDirection = AIM_KEY_DIRECTION[key];
     }
 
     if (key === "Space") {
       if (this.state === "gameOver" || this.state === "win") {
         this.resetGame();
-        this.state = "playing";
+        this.state = "start";
+        this.staticDirty = true;
         this.heldKeys.delete("Space");
       }
     }
