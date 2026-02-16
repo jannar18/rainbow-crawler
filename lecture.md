@@ -439,3 +439,18 @@ Don't gamble. **Drive.**
 <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
 
 ---
+
+## 27. While Claude is working
+
+Some steps — especially `/workflows:plan` and `/workflows:work` — take a while to run.
+
+**You don't have to wait.** Open a new terminal tab and start a new Claude conversation.
+
+Use that time to:
+- Ask Claude questions about the workflow system, the commands, or how things work
+- Explore the codebase
+- Think about your game design
+
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+
+---

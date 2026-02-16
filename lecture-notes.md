@@ -326,3 +326,14 @@ Here's how to get started:
 6. **Iterate** — review, compound what you learned, keep going
 
 Don't gamble. Drive.
+
+## 27. While Claude is working
+
+One last thing — some of these steps, especially plan and work, take a while to run.
+Claude might be crunching for a few minutes.
+
+You don't have to sit and watch.
+Open a new terminal tab, start a new Claude conversation, and use that time productively.
+
+Ask Claude questions about the workflow system, the commands, how things are set up in this repo — explore the codebase, think about your game design.
+Claude can be working for you in one tab while you're learning in another.
