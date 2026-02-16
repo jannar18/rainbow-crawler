@@ -209,10 +209,11 @@ So we've set up a workflow system in this repo that puts all of these principles
 It expands the three-phase pattern we just talked about — research, plan, implement — into five phases.
 
 Brainstorm captures your intent before planning starts.
-Compound captures what you learned after you're done.
+Research doesn't disappear — it gets absorbed into the plan phase. The sub-agents do the research as part of planning.
 
-And notice that there's no separate "research" phase in the five — that's because research gets absorbed into the plan phase.
-The sub-agents do the research as part of planning.
+And the new piece is "close the loop" — review and compound. You use the LLM to check your own work, and then you document what you learned so that future sessions start with that knowledge. The first time you solve a problem, it's research. The second time, it's a lookup.
+
+One practical thing — between each step, you should clear your conversation. Run `/clear`. Each command writes an artifact to a file — a brainstorm doc, a plan file, review findings — and the next command knows how to find it. So you don't need to carry the conversation forward. Starting fresh is compaction in practice. Clean context, dense artifact, next step.
 
 Each phase is a command you can run.
 Let's walk through each piece.

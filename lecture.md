@@ -282,9 +282,9 @@ graph LR
     P -.- PH["🧑 High leverage review"]
     I -.- IH["🧑 Lower leverage review"]
 
-    style RH fill:#ff9,stroke:#333
-    style PH fill:#ff9,stroke:#333
-    style IH fill:#ddd,stroke:#333
+    style RH fill:#ff9,stroke:#333,color:#333
+    style PH fill:#ff9,stroke:#333,color:#333
+    style IH fill:#ddd,stroke:#333,color:#333
 ```
 
 Focus your attention on **research and plans** — that's where a small correction has the biggest impact.
@@ -299,14 +299,27 @@ The system we're using expands the three-phase pattern into **five phases** — 
 
 ```mermaid
 graph LR
-    B["💭 Brainstorm"] -->|compact| P["📋 Plan"]
-    P -->|compact| W["🔨 Work"]
-    W --> R["🔍 Review"]
-    R --> C["📚 Compound"]
+    subgraph Research + Plan
+        S["🔍 Sub-agents"] -->|findings| P["📋 Plan"]
+        B["💭 Brainstorm"] -->|compact| P
+    end
+    subgraph Implement
+        W["🔨 Work"]
+    end
+    subgraph Close the loop
+        R["🔍 Review"] --> C["📚 Compound"]
+    end
+
+    P -->|compact| W
+    W --> R
     C -.->|knowledge feeds back| P
 ```
 
-Brainstorm captures your intent before planning. Compound captures what you learned after. The **plan** phase absorbs research — sub-agents do it as part of planning.
+Research didn't disappear — it got delegated to **sub-agents** inside the plan phase. Brainstorm captures your intent before planning.
+
+The new piece is **"close the loop"** — use the LLM to check your work, and document what you learned so future sessions start smarter.
+
+**Practical tip:** `/clear` between each step. Each command writes an artifact that the next one finds automatically. Fresh context = compaction in practice.
 
 <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
 

@@ -118,20 +118,22 @@ To add more review agents, create the agent file in `.claude/subagents/` and add
 
 ## Quick Start
 
+**Important: start a new conversation (`/clear`) between each step.** Each command writes an artifact (a brainstorm doc, a plan file, etc.) and the next command knows how to find it. Starting fresh keeps your context clean — this is the compaction principle in practice.
+
 ```bash
 # Brainstorm an idea
 /workflows:brainstorm "multiplayer lobby system"
 
-# Turn it into a plan
+# /clear, then turn it into a plan (it finds the last brainstorm automatically)
 /workflows:plan "implement the lobby system from the brainstorm"
 
-# Execute the plan
+# /clear, then execute the plan (it finds the last plan automatically)
 /workflows:work docs/plans/2026-02-15-feat-lobby-system-plan.md
 
-# Review the resulting PR
+# /clear, then review the resulting PR
 /workflows:review 1
 
-# Document what you learned
+# /clear, then document what you learned
 /workflows:compound "solved the websocket connection issue"
 ```
 

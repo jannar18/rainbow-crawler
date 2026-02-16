@@ -28,7 +28,7 @@ npm install
 npm run dev
 ```
 
-Then, in Claude Code:
+Then, in Claude Code (start a new conversation with `/clear` between each step):
 
 1. `/workflows:brainstorm` — figure out what game you want to build
 2. `/workflows:plan` — let Claude research the codebase and create an implementation plan
@@ -36,6 +36,8 @@ Then, in Claude Code:
 4. `/workflows:work` — execute the plan
 5. `/workflows:review` — run a multi-agent code review on your changes
 6. `/workflows:compound` — document what you learned so future plans get smarter
+
+Each command writes an artifact that the next one finds automatically. Clearing between steps keeps your context clean.
 
 While Claude is working on a long step, open a new terminal tab and start another Claude conversation — ask questions about the workflow system, explore the code, think about your design.
 
