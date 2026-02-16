@@ -470,19 +470,19 @@ All game logic lives in `DungeonCrawlerScene.ts`. Utility types/interfaces defin
 
 **Tasks:**
 
-- [ ] Implement dungeon data structure (room graph, connections)
-- [ ] Implement room transition (walk onto door → swap room, reposition player)
-- [ ] Implement procedural room generation (carve open area, add interior walls, validate reachability)
-- [ ] Implement dungeon graph generation (5-7 rooms, linear chain + branches, boss room at end)
-- [ ] Implement room population (enemy spawns, pickup spawns based on room position)
-- [ ] Implement health pickups (walk over to collect, restores 1 HP)
-- [ ] Implement rainbow power bar (fills on enemy heal, displayed as HUD bar)
-- [ ] Implement boss enemy (1x1, phase 1 stationary spread shot, phase 2 adds movement)
-- [ ] Implement rainbow power → boss health reduction mechanic
-- [ ] Implement win state (boss healed → win screen)
-- [ ] Implement room cleared tracking (backtracking to cleared rooms stays safe)
-- [ ] Static layer rendering for walls (redraw only on room transition)
-- [ ] Room indicator in HUD (which room, how many cleared)
+- [x] Implement dungeon data structure (room graph, connections)
+- [x] Implement room transition (walk onto door → swap room, reposition player)
+- [x] Implement procedural room generation (carve open area, add interior walls, validate reachability)
+- [x] Implement dungeon graph generation (5-7 rooms, linear chain + branches, boss room at end)
+- [x] Implement room population (enemy spawns, pickup spawns based on room position)
+- [x] Implement health pickups (walk over to collect, restores 1 HP)
+- [x] Implement rainbow power bar (fills on enemy heal, displayed as HUD bar)
+- [x] Implement boss enemy (1x1, phase 1 stationary spread shot, phase 2 adds movement)
+- [x] Implement rainbow power → boss health reduction mechanic
+- [x] Implement win state (boss healed → win screen)
+- [x] Implement room cleared tracking (backtracking to cleared rooms stays safe)
+- [x] Static layer rendering for walls (redraw only on room transition)
+- [x] Room indicator in HUD (which room, how many cleared)
 
 **Success criteria:** Player can explore multiple rooms, heal enemies to fill the rainbow bar, reach the boss room, and win. Full gameplay loop works.
 
