@@ -38,7 +38,7 @@ interface Scene {
 }
 ```
 
-`GameContext` provides: `gridSize` (20), `cellSize` (30), `canvasWidth` (600), `canvasHeight` (600).
+`GameContext` provides: `gridSize` (20), `cellSize` (32), `canvasWidth` (640), `canvasHeight` (640).
 
 ## Renderer API
 
@@ -46,9 +46,14 @@ The `Renderer` (passed to `render()`) provides:
 
 | Method | Coordinates | Description |
 |--------|------------|-------------|
-| `drawRect(gridX, gridY, widthCells, heightCells, color)` | Grid cells | Draw a colored rectangle |
-| `drawText(text, pixelX, pixelY, options?)` | Pixels | Draw text (options: `fontSize`, `color`) |
-| `clear()` | — | Remove all drawn objects |
+| `drawRect(gridX, gridY, widthCells, heightCells, color)` | Grid cells | Draw a colored rectangle (dynamic layer) |
+| `drawRectStatic(gridX, gridY, widthCells, heightCells, color)` | Grid cells | Draw a colored rectangle (static layer, persists between frames) |
+| `drawRectAlpha(gridX, gridY, widthCells, heightCells, color, alpha)` | Grid cells | Draw a translucent rectangle |
+| `drawSprite(gridX, gridY, texture)` | Grid cells | Draw a PixiJS Sprite at a grid cell |
+| `drawBar(pixelX, pixelY, width, height, fillRatio, fgColor, bgColor)` | Pixels | Draw a progress bar |
+| `drawText(text, pixelX, pixelY, options?)` | Pixels | Draw text (options: `fontSize`, `color`, `anchor`) |
+| `clear()` | — | Remove and destroy all dynamic-layer objects |
+| `clearStatic()` | — | Remove and destroy all static-layer objects |
 | `stage` (readonly) | — | Raw PixiJS Container for advanced use |
 
 Grid methods convert cell coordinates to pixels internally. `drawText` uses pixel coordinates since text isn't grid-aligned.
@@ -60,9 +65,9 @@ Defined in `src/engine/types.ts`:
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `GRID_SIZE` | 20 | Cells per axis |
-| `CELL_SIZE` | 30 | Pixels per cell |
-| `CANVAS_WIDTH` | 600 | Canvas width in pixels |
-| `CANVAS_HEIGHT` | 600 | Canvas height in pixels |
+| `CELL_SIZE` | 32 | Pixels per cell |
+| `CANVAS_WIDTH` | 640 | Canvas width in pixels |
+| `CANVAS_HEIGHT` | 640 | Canvas height in pixels |
 | `TICK_RATE_MS` | 150 | Milliseconds per tick (~6.67 ticks/sec) |
 | `TICK_RATE_S` | 0.15 | Seconds per tick (passed to `update()`) |
 

@@ -129,10 +129,14 @@ export class Renderer implements IRenderer {
   }
 
   clear(): void {
-    this.drawContainer.removeChildren();
+    for (const child of this.drawContainer.removeChildren()) {
+      child.destroy();
+    }
   }
 
   clearStatic(): void {
-    this.staticContainer.removeChildren();
+    for (const child of this.staticContainer.removeChildren()) {
+      child.destroy();
+    }
   }
 }

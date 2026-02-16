@@ -1,5 +1,5 @@
 import type { Scene, GameContext, Renderer } from "../engine/types.js";
-import { CANVAS_WIDTH, CANVAS_HEIGHT, CELL_SIZE } from "../engine/types.js";
+import { CANVAS_WIDTH, GRID_SIZE } from "../engine/types.js";
 
 // --- Types ---
 
@@ -37,11 +37,10 @@ interface Room {
 
 // --- Constants ---
 
-const GRID_SIZE = 20;
 const PLAYER_MAX_HEALTH = 5;
 const SHOOT_COOLDOWN = 3; // ticks
 const BEAM_SPEED = 2; // cells per tick
-const I_FRAME_DURATION = 4; // ticks
+const I_FRAME_DURATION = 4; // ticks — assigned in Phase 2 damage logic
 
 const DELTA: Record<Direction, Point> = {
   up: { x: 0, y: -1 },
@@ -192,6 +191,8 @@ export class DungeonCrawlerScene implements Scene {
     // --- 2. Move player projectiles ---
     this.moveProjectiles();
 
+    // --- 3-6. Enemy movement, AI, collision (Phase 2) ---
+
     // --- 7. Update effect timers ---
     if (this.player.iFrames > 0) {
       this.player.iFrames--;
@@ -199,8 +200,7 @@ export class DungeonCrawlerScene implements Scene {
   }
 
   private getHeldDirection(): Direction | null {
-    // Priority: last pressed wins, but we iterate in a fixed order
-    // Check WASD first (more common for this game), then arrows
+    // Fixed priority: WASD first, then arrows. First held key wins.
     for (const key of [
       "KeyW",
       "KeyS",
@@ -350,16 +350,30 @@ export class DungeonCrawlerScene implements Scene {
       playerColor
     );
 
-    // Draw facing indicator (small rect in facing direction edge)
+    // Draw facing indicator (thin bar on the edge of the player cell)
     const facingDelta = DELTA[this.player.facing];
-    const indicatorSize = 0.3;
-    const px = this.player.pos.x + (facingDelta.x > 0 ? 0.7 : facingDelta.x < 0 ? 0 : 0.35);
-    const py = this.player.pos.y + (facingDelta.y > 0 ? 0.7 : facingDelta.y < 0 ? 0 : 0.35);
+    const barThick = 0.2;
+    const barLong = 0.5;
+    const isHorizontal = facingDelta.x !== 0;
+    const px =
+      this.player.pos.x +
+      (facingDelta.x > 0
+        ? 1 - barThick
+        : facingDelta.x < 0
+          ? 0
+          : (1 - barLong) / 2);
+    const py =
+      this.player.pos.y +
+      (facingDelta.y > 0
+        ? 1 - barThick
+        : facingDelta.y < 0
+          ? 0
+          : (1 - barLong) / 2);
     renderer.drawRect(
       px,
       py,
-      facingDelta.x !== 0 ? indicatorSize : indicatorSize,
-      facingDelta.y !== 0 ? indicatorSize : indicatorSize,
+      isHorizontal ? barThick : barLong,
+      isHorizontal ? barLong : barThick,
       COLOR_FACING_INDICATOR
     );
   }
@@ -386,6 +400,7 @@ export class DungeonCrawlerScene implements Scene {
   }
 
   private renderStartScreen(renderer: Renderer): void {
+    renderer.drawRectAlpha(0, 0, GRID_SIZE, GRID_SIZE, 0x000000, 0.7);
     const cx = CANVAS_WIDTH / 2;
     renderer.drawText("Rainbow Crawler", cx, 180, {
       fontSize: 48,
@@ -455,9 +470,11 @@ export class DungeonCrawlerScene implements Scene {
     if (key === "Space") {
       if (this.state === "start") {
         this.state = "playing";
+        this.heldKeys.delete("Space");
       } else if (this.state === "gameOver" || this.state === "win") {
         this.resetGame();
-        this.state = "start";
+        this.state = "playing";
+        this.heldKeys.delete("Space");
       }
     }
   }
