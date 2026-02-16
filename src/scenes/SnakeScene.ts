@@ -1,4 +1,6 @@
+import { Graphics } from "pixi.js";
 import type { Scene, GameContext, Renderer } from "../engine/types.js";
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from "../engine/types.js";
 
 type GameState = "start" | "playing" | "gameOver";
 type Direction = "up" | "down" | "left" | "right";
@@ -127,6 +129,7 @@ export class SnakeScene implements Scene {
 
   render(renderer: Renderer): void {
     renderer.clear();
+    this.renderBorder(renderer);
 
     if (this.state === "start") {
       this.renderStartScreen(renderer);
@@ -141,6 +144,13 @@ export class SnakeScene implements Scene {
 
     // Playing state
     this.renderGameField(renderer);
+  }
+
+  private renderBorder(renderer: Renderer): void {
+    const g = new Graphics();
+    g.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    g.stroke({ color: 0x333355, width: 2 });
+    renderer.stage.addChild(g);
   }
 
   private renderGameField(renderer: Renderer): void {
@@ -165,14 +175,17 @@ export class SnakeScene implements Scene {
   }
 
   private renderStartScreen(renderer: Renderer): void {
-    renderer.drawText("Snake", 210, 200, { fontSize: 64, color: 0x44cc44 });
-    renderer.drawText("Press SPACE to start", 160, 320, {
+    const cx = CANVAS_WIDTH / 2;
+    renderer.drawText("Snake", cx, 200, { fontSize: 64, color: 0x44cc44, anchor: 0.5 });
+    renderer.drawText("Press SPACE to start", cx, 320, {
       fontSize: 24,
       color: 0xaaaaaa,
+      anchor: 0.5,
     });
-    renderer.drawText("Arrow keys or WASD to move", 130, 360, {
+    renderer.drawText("Arrow keys or WASD to move", cx, 360, {
       fontSize: 18,
       color: 0x666666,
+      anchor: 0.5,
     });
   }
 
@@ -182,17 +195,21 @@ export class SnakeScene implements Scene {
 
     // Re-draw the field on top at reduced opacity isn't easy with primitives,
     // so we just show game over text on dark background
-    renderer.drawText("Game Over", 170, 200, {
+    const cx = CANVAS_WIDTH / 2;
+    renderer.drawText("Game Over", cx, 200, {
       fontSize: 48,
       color: 0xff4444,
+      anchor: 0.5,
     });
-    renderer.drawText(`Score: ${this.score}`, 240, 270, {
+    renderer.drawText(`Score: ${this.score}`, cx, 270, {
       fontSize: 28,
       color: 0xffffff,
+      anchor: 0.5,
     });
-    renderer.drawText("Press SPACE to restart", 150, 340, {
+    renderer.drawText("Press SPACE to restart", cx, 340, {
       fontSize: 24,
       color: 0xaaaaaa,
+      anchor: 0.5,
     });
   }
 
