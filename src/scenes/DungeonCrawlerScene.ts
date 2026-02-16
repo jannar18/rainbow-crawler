@@ -1,5 +1,34 @@
+import type { Texture } from "pixi.js";
 import type { Scene, GameContext, Renderer } from "../engine/types.js";
-import { CANVAS_WIDTH, GRID_SIZE } from "../engine/types.js";
+import { CANVAS_WIDTH, CELL_SIZE, GRID_SIZE } from "../engine/types.js";
+
+// --- Texture types ---
+
+export interface GameTextures {
+  player: {
+    fairy: Texture[];
+    wizard: Texture[];
+  };
+  chaser: Record<string, { idle: Texture[]; walk: Texture[] }>;
+  chaserHealed: {
+    elf_f: Texture[];
+    elf_m: Texture[];
+  };
+  ranger: { idle: Texture[]; run: Texture[] };
+  rangerHealed: Texture[];
+  boss: { idle: Texture[]; walk: Texture[] };
+  bossHealed: { idle: Texture[]; walk: Texture[] };
+  tiles: {
+    wallMid: Texture;
+    floors: Texture[];
+    doorClosed: Texture;
+  };
+  ui: {
+    heartFull: Texture;
+    heartHalf: Texture;
+    heartEmpty: Texture;
+  };
+}
 
 // --- Types ---
 
@@ -13,6 +42,10 @@ type CellType = "wall" | "floor" | "door";
 type GameState = "start" | "playing" | "gameOver" | "win";
 type EnemyType = "chaser" | "ranger" | "boss";
 type EnemyState = "active" | "calm" | "dissolving";
+type PlayerCharacter = "fairy" | "wizard";
+
+const GNOLL_VARIANTS = ["gnollbrute", "gnollshaman", "gnollscout"] as const;
+const ELF_GENDERS = ["elf_f", "elf_m"] as const;
 
 interface Player {
   pos: Point;
@@ -33,6 +66,8 @@ interface Enemy {
   moveCooldown: number;
   shootCooldown: number;
   maxHealth: number;
+  gnollVariant: string; // chaser: which gnoll skin
+  healedGender: string; // chaser: which elf gender when healed
 }
 
 interface Projectile {
@@ -71,16 +106,16 @@ const SHOOT_COOLDOWN = 3;
 const BEAM_SPEED = 2;
 const I_FRAME_DURATION = 4;
 
-const ENEMY_HEALTH = 2;
-const CHASER_MOVE_INTERVAL = 2;
-const RANGER_FIRE_INTERVAL = 5;
+const ENEMY_HEALTH = 1;
+const CHASER_MOVE_INTERVAL = 3;
+const RANGER_FIRE_INTERVAL = 7;
 const RANGER_SHOT_SPEED = 1;
 const CALM_DURATION = 6;
 const DISSOLVE_DURATION = 4;
 
-const BOSS_BASE_HEALTH = 5;
-const BOSS_FIRE_INTERVAL = 5;
-const BOSS_MOVE_INTERVAL = 4; // half speed chaser (phase 2)
+const BOSS_BASE_HEALTH = 3;
+const BOSS_FIRE_INTERVAL = 7;
+const BOSS_MOVE_INTERVAL = 4;
 const BOSS_SHOT_SPEED = 1;
 
 const DELTA: Record<Direction, Point> = {
@@ -97,22 +132,20 @@ const OPPOSITE_DIR: Record<Direction, Direction> = {
   right: "left",
 };
 
-// --- Colors ---
+// Soft rainbow palette (from art direction brainstorm)
+const RAINBOW_COLORS = [
+  0xff6b6b, 0xffa06b, 0xffd93d, 0x6bcf7f, 0x6bb5ff, 0x9b7dff, 0xd97dff,
+];
 
-const COLOR_WALL = 0x444466;
-const COLOR_FLOOR = 0x1a1a2e;
-const COLOR_DOOR = 0x886622;
-const COLOR_PLAYER = 0x44cc44;
-const COLOR_PLAYER_HIT = 0xff4444;
-const COLOR_BEAM = 0xff77ff;
-const COLOR_FACING_INDICATOR = 0x88ff88;
-const COLOR_CHASER = 0xcc4444;
-const COLOR_RANGER = 0x8844cc;
-const COLOR_BOSS = 0xff2200;
-const COLOR_ENEMY_CALM = 0x88aacc;
+// Environment colors
+
+// UI colors
+const COLOR_UI_TEXT = 0xffeedd;
+const COLOR_UI_DIM = 0x9988aa;
 const COLOR_ENEMY_SHOT = 0x884422;
-const COLOR_PICKUP_HEALTH = 0x44ff88;
-const RAINBOW_COLORS = [0xff0000, 0xff8800, 0xffff00, 0x00ff00, 0x0088ff, 0x8800ff];
+
+// Entity sprite scale (1.0 = one cell, 1.4 = 40% bigger, centered)
+const ENTITY_SCALE = 1.4;
 
 // --- Key mappings ---
 
@@ -126,6 +159,12 @@ const KEY_DIRECTION: Record<string, Direction> = {
   KeyA: "left",
   KeyD: "right",
 };
+
+// --- Animation helper ---
+
+function animFrame(tick: number, frameCount: number, ticksPerFrame: number): number {
+  return Math.floor(tick / ticksPerFrame) % frameCount;
+}
 
 // --- Simple seeded RNG ---
 
@@ -161,10 +200,7 @@ function doorPos(dir: Direction): Point {
 }
 
 function entryPos(dir: Direction): Point {
-  // Position just inside the door (1 cell inward from border)
   const door = doorPos(dir);
-  const d = DELTA[dir];
-  // We enter FROM the opposite direction, so step inward
   const inward = DELTA[OPPOSITE_DIR[dir]];
   return { x: door.x + inward.x, y: door.y + inward.y };
 }
@@ -176,7 +212,6 @@ function generateDungeon(): Dungeon {
   const numRooms = rng.nextInt(5, 7);
   const dirs: Direction[] = ["up", "down", "left", "right"];
 
-  // Build room graph as a tree: linear chain with 1-2 branches
   interface RoomNode {
     id: number;
     connections: Map<Direction, number>;
@@ -187,9 +222,7 @@ function generateDungeon(): Dungeon {
     nodes.push({ id: i, connections: new Map() });
   }
 
-  // Linear chain: rooms 0-1-2-...-N connecting in random directions
   for (let i = 0; i < numRooms - 1; i++) {
-    // Pick a random direction for this connection that isn't already used
     const availDirs = dirs.filter((d) => !nodes[i].connections.has(d));
     if (availDirs.length === 0) break;
     rng.shuffle(availDirs);
@@ -198,10 +231,8 @@ function generateDungeon(): Dungeon {
     nodes[i + 1].connections.set(OPPOSITE_DIR[dir], i);
   }
 
-  // Boss room is the last room in the chain
   const bossRoom = numRooms - 1;
 
-  // Generate rooms
   const rooms: Room[] = [];
   let totalEnemies = 0;
 
@@ -210,17 +241,14 @@ function generateDungeon(): Dungeon {
     rooms.push(room);
   }
 
-  // Populate rooms
   for (let i = 0; i < numRooms; i++) {
     const room = rooms[i];
     const floorCells = getFloorCells(room);
 
     if (i === 0) {
-      // Start room: no enemies, 1 health pickup, already cleared
       placePickups(rng, room, floorCells, 1);
       room.cleared = true;
     } else if (i === bossRoom) {
-      // Boss room: boss only
       const bossPos = pickSpawnPos(rng, floorCells, room);
       if (bossPos) {
         room.enemies.push({
@@ -232,11 +260,12 @@ function generateDungeon(): Dungeon {
           stateTimer: 0,
           moveCooldown: BOSS_MOVE_INTERVAL,
           shootCooldown: BOSS_FIRE_INTERVAL,
+          gnollVariant: "",
+          healedGender: "",
         });
         totalEnemies++;
       }
     } else {
-      // Normal rooms: 2-4 enemies, 1-2 pickups
       const enemyCount = rng.nextInt(2, 4);
       for (let e = 0; e < enemyCount; e++) {
         const pos = pickSpawnPos(rng, floorCells, room);
@@ -251,13 +280,14 @@ function generateDungeon(): Dungeon {
           stateTimer: 0,
           moveCooldown: type === "chaser" ? CHASER_MOVE_INTERVAL : 0,
           shootCooldown: type === "ranger" ? RANGER_FIRE_INTERVAL : 0,
+          gnollVariant: GNOLL_VARIANTS[rng.nextInt(0, 2)],
+          healedGender: ELF_GENDERS[rng.nextInt(0, 1)],
         });
         totalEnemies++;
       }
       placePickups(rng, room, floorCells, rng.nextInt(1, 2));
     }
 
-    // Set player spawn for each room (near center of open area)
     room.playerSpawn = findPlayerSpawn(room);
   }
 
@@ -268,11 +298,9 @@ function generateRoom(
   rng: ReturnType<typeof makeRng>,
   connections: Map<Direction, number>
 ): Room {
-  // Try up to 5 times to generate a valid room
   for (let attempt = 0; attempt < 5; attempt++) {
     const grid: CellType[][] = [];
 
-    // Fill with walls
     for (let y = 0; y < GRID_SIZE; y++) {
       const row: CellType[] = [];
       for (let x = 0; x < GRID_SIZE; x++) {
@@ -281,7 +309,6 @@ function generateRoom(
       grid.push(row);
     }
 
-    // Carve open area (randomized size, centered)
     const areaW = rng.nextInt(10, 16);
     const areaH = rng.nextInt(10, 16);
     const startX = Math.floor((GRID_SIZE - areaW) / 2);
@@ -293,12 +320,10 @@ function generateRoom(
       }
     }
 
-    // Add 2-4 interior wall segments for cover
     const numObstacles = rng.nextInt(2, 4);
     for (let o = 0; o < numObstacles; o++) {
       const obstacleType = rng.nextInt(0, 2);
       if (obstacleType === 0) {
-        // Pillar (2x2)
         const px = rng.nextInt(startX + 2, startX + areaW - 4);
         const py = rng.nextInt(startY + 2, startY + areaH - 4);
         for (let dy = 0; dy < 2; dy++) {
@@ -307,7 +332,6 @@ function generateRoom(
           }
         }
       } else if (obstacleType === 1) {
-        // Horizontal wall segment
         const len = rng.nextInt(3, 5);
         const wx = rng.nextInt(startX + 2, startX + areaW - len - 2);
         const wy = rng.nextInt(startY + 2, startY + areaH - 3);
@@ -315,7 +339,6 @@ function generateRoom(
           grid[wy][wx + i] = "wall";
         }
       } else {
-        // Vertical wall segment
         const len = rng.nextInt(3, 5);
         const wx = rng.nextInt(startX + 2, startX + areaW - 3);
         const wy = rng.nextInt(startY + 2, startY + areaH - len - 2);
@@ -325,19 +348,14 @@ function generateRoom(
       }
     }
 
-    // Carve corridors from open area to door positions + place doors
     for (const [dir] of connections) {
       const door = doorPos(dir);
       grid[door.y][door.x] = "door";
-
-      // Carve a corridor from the door to the open area
       carveCorridor(grid, door, dir, startX, startY, startX + areaW - 1, startY + areaH - 1);
     }
 
-    // Validate: all floor cells + door cells reachable from center
     const centerX = Math.floor(GRID_SIZE / 2);
     const centerY = Math.floor(GRID_SIZE / 2);
-    // Find a walkable cell near center
     let seedCell: Point | null = null;
     for (let r = 0; r < GRID_SIZE; r++) {
       for (let dy = -r; dy <= r; dy++) {
@@ -382,7 +400,6 @@ function generateRoom(
     }
   }
 
-  // Fallback: simple open room
   return generateFallbackRoom(connections);
 }
 
@@ -400,11 +417,9 @@ function carveCorridor(
   let x = door.x + d.x;
   let y = door.y + d.y;
 
-  // Carve straight from door toward open area
   while (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-    if (grid[y][x] === "floor") break; // reached open area
+    if (grid[y][x] === "floor") break;
     grid[y][x] = "floor";
-    // Check if we're inside the open area bounds
     if (x >= areaX1 && x <= areaX2 && y >= areaY1 && y <= areaY2) break;
     x += d.x;
     y += d.y;
@@ -450,13 +465,11 @@ function generateFallbackRoom(connections: Map<Direction, number>): Room {
     grid.push(row);
   }
 
-  // Place doors
   for (const [dir] of connections) {
     const door = doorPos(dir);
     grid[door.y][door.x] = "door";
   }
 
-  // Add a few pillars for interest
   grid[5][5] = "wall";
   grid[5][6] = "wall";
   grid[6][5] = "wall";
@@ -494,18 +507,14 @@ function pickSpawnPos(
   floorCells: Point[],
   room: Room
 ): Point | null {
-  // Pick a random floor cell that isn't near a door and isn't occupied by another enemy
   const candidates = floorCells.filter((c) => {
-    // Not near any door
     for (const [dir] of room.connections) {
       const door = doorPos(dir);
       if (Math.abs(c.x - door.x) + Math.abs(c.y - door.y) < 3) return false;
     }
-    // Not occupied by existing enemy
     for (const e of room.enemies) {
       if (e.pos.x === c.x && e.pos.y === c.y) return false;
     }
-    // Not occupied by existing pickup
     for (const p of room.pickups) {
       if (p.pos.x === c.x && p.pos.y === c.y) return false;
     }
@@ -531,7 +540,6 @@ function placePickups(
 }
 
 function findPlayerSpawn(room: Room): Point {
-  // Find a walkable cell near center
   const cx = Math.floor(GRID_SIZE / 2);
   const cy = Math.floor(GRID_SIZE / 2);
   for (let r = 0; r < GRID_SIZE; r++) {
@@ -553,15 +561,21 @@ function findPlayerSpawn(room: Room): Point {
 // --- Scene ---
 
 export class DungeonCrawlerScene implements Scene {
+  private textures: GameTextures;
   private state: GameState = "start";
   private player!: Player;
+  private playerCharacter: PlayerCharacter = "fairy";
   private projectiles: Projectile[] = [];
   private dungeon!: Dungeon;
   private heldKeys = new Set<string>();
   private staticDirty = true;
   private tickCount = 0;
-  private rainbowPower = 0; // 0-1 float
+  private rainbowPower = 0;
   private healedEnemies = 0;
+
+  constructor(textures: GameTextures) {
+    this.textures = textures;
+  }
 
   init(_context: GameContext): void {
     this.resetGame();
@@ -591,8 +605,8 @@ export class DungeonCrawlerScene implements Scene {
   }
 
   update(_dt: number): void {
+    this.tickCount++; // always tick for animations (start screen, win screen)
     if (this.state !== "playing") return;
-    this.tickCount++;
 
     const enemies = this.room.enemies;
 
@@ -625,7 +639,7 @@ export class DungeonCrawlerScene implements Scene {
     const cell = this.room.grid[this.player.pos.y][this.player.pos.x];
     if (cell === "door") {
       this.handleDoorTransition();
-      return; // skip rest of tick after transition
+      return;
     }
 
     // --- 1b. Process input: shooting ---
@@ -689,7 +703,6 @@ export class DungeonCrawlerScene implements Scene {
     this.updateEnemyTimers();
 
     // --- 8. Remove dissolved enemies, update rainbow power ---
-    const prevCount = this.room.enemies.length;
     this.room.enemies = enemies.filter((e) => {
       if (e.state === "dissolving" && e.stateTimer <= 0) {
         this.healedEnemies++;
@@ -701,7 +714,6 @@ export class DungeonCrawlerScene implements Scene {
       return true;
     });
 
-    // Mark room cleared when all enemies are gone
     if (this.room.enemies.length === 0) {
       this.room.cleared = true;
     }
@@ -710,7 +722,6 @@ export class DungeonCrawlerScene implements Scene {
     if (this.player.health <= 0) {
       this.state = "gameOver";
     }
-    // Win: boss room cleared (boss dissolved)
     if (this.dungeon.currentRoom === this.dungeon.bossRoom && this.room.cleared) {
       this.state = "win";
     }
@@ -722,7 +733,6 @@ export class DungeonCrawlerScene implements Scene {
     const pos = this.player.pos;
     let transitionDir: Direction | null = null;
 
-    // Determine which door the player is on
     for (const [dir] of this.room.connections) {
       const door = doorPos(dir);
       if (pos.x === door.x && pos.y === door.y) {
@@ -731,23 +741,18 @@ export class DungeonCrawlerScene implements Scene {
       }
     }
 
-    if (!transitionDir) return; // standing on a door that doesn't connect anywhere
+    if (!transitionDir) return;
 
     const targetRoomIdx = this.room.connections.get(transitionDir);
     if (targetRoomIdx === undefined) return;
 
-    // Clear projectiles on room transition
     this.projectiles = [];
-
-    // Swap room
     this.dungeon.currentRoom = targetRoomIdx;
 
-    // Position player at the entry point of the corresponding door
     const enterDir = OPPOSITE_DIR[transitionDir];
     const entry = entryPos(enterDir);
     this.player.pos = { ...entry };
 
-    // Redraw static layer
     this.staticDirty = true;
   }
 
@@ -916,9 +921,8 @@ export class DungeonCrawlerScene implements Scene {
   }
 
   private updateBoss(enemy: Enemy): void {
-    // Boss movement: only in phase 2 (below 50% health)
     const healthRatio = enemy.health / enemy.maxHealth;
-    if (healthRatio >= 0.5) return; // phase 1: stationary
+    if (healthRatio >= 0.5) return;
 
     enemy.moveCooldown--;
     if (enemy.moveCooldown > 0) return;
@@ -936,23 +940,21 @@ export class DungeonCrawlerScene implements Scene {
     if (enemy.shootCooldown > 0) return;
     enemy.shootCooldown = BOSS_FIRE_INTERVAL;
 
-    // Boss fires 3-directional spread: picks most-aligned cardinal to player + adjacent cardinals
     const dirs: Direction[] = ["up", "down", "left", "right"];
     let bestDir: Direction = "down";
     let bestAlignment = 0;
 
     for (const dir of dirs) {
       const d = DELTA[dir];
-      const dx = this.player.pos.x - enemy.pos.x;
-      const dy = this.player.pos.y - enemy.pos.y;
-      const alignment = dx * d.x + dy * d.y; // dot product
+      const ddx = this.player.pos.x - enemy.pos.x;
+      const ddy = this.player.pos.y - enemy.pos.y;
+      const alignment = ddx * d.x + ddy * d.y;
       if (alignment > bestAlignment) {
         bestAlignment = alignment;
         bestDir = dir;
       }
     }
 
-    // Spread: fire in bestDir and two perpendicular directions
     const spreadDirs = this.getSpreadDirections(bestDir);
     for (const dir of spreadDirs) {
       const d = DELTA[dir];
@@ -1125,128 +1127,153 @@ export class DungeonCrawlerScene implements Scene {
   }
 
   private renderRoom(renderer: Renderer): void {
+    const tiles = this.textures.tiles;
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
         const cell = this.room.grid[y][x];
-        let color: number;
         switch (cell) {
           case "wall":
-            color = COLOR_WALL;
+            renderer.drawSpriteStatic(x, y, tiles.wallMid);
             break;
           case "door":
-            color = COLOR_DOOR;
+            renderer.drawSpriteStatic(x, y, tiles.doorClosed);
             break;
           case "floor":
           default:
-            color = COLOR_FLOOR;
+            renderer.drawRectStatic(x, y, 1, 1, 0x33334d);
             break;
         }
-        renderer.drawRectStatic(x, y, 1, 1, color);
       }
     }
   }
 
   private renderEntities(renderer: Renderer): void {
-    // Draw pickups
+    const tex = this.textures;
+    const sc = ENTITY_SCALE;
+
+    // Draw pickups (heart sprites — slightly smaller than entities)
     for (const pickup of this.room.pickups) {
       if (pickup.collected) continue;
-      renderer.drawRect(pickup.pos.x, pickup.pos.y, 1, 1, COLOR_PICKUP_HEALTH);
+      renderer.drawSpriteScaled(pickup.pos.x, pickup.pos.y, tex.ui.heartFull, 1.2);
     }
 
     // Draw enemies
     for (const enemy of this.room.enemies) {
       if (enemy.state === "active") {
-        let color: number;
-        if (enemy.type === "chaser") color = COLOR_CHASER;
-        else if (enemy.type === "ranger") color = COLOR_RANGER;
-        else color = COLOR_BOSS;
-        renderer.drawRect(enemy.pos.x, enemy.pos.y, 1, 1, color);
+        const frame = this.getEnemyActiveTexture(enemy);
+        renderer.drawSpriteScaled(enemy.pos.x, enemy.pos.y, frame, sc);
       } else if (enemy.state === "calm") {
+        // Show healed form at reduced alpha (pulsing)
         const alpha = 0.5 + 0.3 * (enemy.stateTimer / CALM_DURATION);
-        renderer.drawRectAlpha(
-          enemy.pos.x, enemy.pos.y, 1, 1, COLOR_ENEMY_CALM, alpha
-        );
+        const frame = this.getEnemyHealedTexture(enemy);
+        renderer.drawSpriteScaled(enemy.pos.x, enemy.pos.y, frame, sc, alpha);
       } else if (enemy.state === "dissolving") {
+        // Show healed form with rainbow tint, fading out
         const progress = 1 - enemy.stateTimer / DISSOLVE_DURATION;
         const colorIdx = Math.floor(progress * (RAINBOW_COLORS.length - 1));
         const alpha = 1 - progress;
-        renderer.drawRectAlpha(
-          enemy.pos.x, enemy.pos.y, 1, 1,
-          RAINBOW_COLORS[colorIdx], alpha
+        const frame = this.getEnemyHealedTexture(enemy);
+        renderer.drawSpriteScaled(
+          enemy.pos.x, enemy.pos.y, frame, sc, alpha,
+          RAINBOW_COLORS[colorIdx]
         );
       }
     }
 
     // Draw projectiles
     for (const proj of this.projectiles) {
-      const color = proj.isPlayerBeam ? COLOR_BEAM : COLOR_ENEMY_SHOT;
-      renderer.drawRect(proj.pos.x, proj.pos.y, 1, 1, color);
+      if (proj.isPlayerBeam) {
+        // Rainbow beam: color cycles based on position
+        const colorIdx = (proj.pos.x + proj.pos.y + this.tickCount) % RAINBOW_COLORS.length;
+        renderer.drawRectAlpha(
+          proj.pos.x + 0.15, proj.pos.y + 0.15, 0.7, 0.7,
+          RAINBOW_COLORS[colorIdx], 0.9
+        );
+      } else {
+        renderer.drawRectAlpha(
+          proj.pos.x + 0.2, proj.pos.y + 0.2, 0.6, 0.6,
+          COLOR_ENEMY_SHOT, 0.9
+        );
+      }
     }
 
     // Draw player
-    const playerColor =
-      this.player.iFrames > 0 && this.player.iFrames % 2 === 0
-        ? COLOR_PLAYER_HIT
-        : COLOR_PLAYER;
-    renderer.drawRect(
-      this.player.pos.x, this.player.pos.y, 1, 1, playerColor
-    );
+    if (this.player.iFrames > 0 && this.player.iFrames % 2 === 0) {
+      // Blink: skip rendering every other iFrame tick
+    } else {
+      const playerFrames = tex.player[this.playerCharacter];
+      const frame = animFrame(this.tickCount, playerFrames.length, 4);
+      renderer.drawSpriteScaled(this.player.pos.x, this.player.pos.y, playerFrames[frame], sc);
+    }
+  }
 
-    // Draw facing indicator
-    const facingDelta = DELTA[this.player.facing];
-    const barThick = 0.2;
-    const barLong = 0.5;
-    const isHorizontal = facingDelta.x !== 0;
-    const px =
-      this.player.pos.x +
-      (facingDelta.x > 0
-        ? 1 - barThick
-        : facingDelta.x < 0
-          ? 0
-          : (1 - barLong) / 2);
-    const py =
-      this.player.pos.y +
-      (facingDelta.y > 0
-        ? 1 - barThick
-        : facingDelta.y < 0
-          ? 0
-          : (1 - barLong) / 2);
-    renderer.drawRect(
-      px, py,
-      isHorizontal ? barThick : barLong,
-      isHorizontal ? barLong : barThick,
-      COLOR_FACING_INDICATOR
-    );
+  private getEnemyActiveTexture(enemy: Enemy): Texture {
+    const tex = this.textures;
+    const frame4 = animFrame(this.tickCount, 4, 3);
+
+    if (enemy.type === "chaser") {
+      const variant = tex.chaser[enemy.gnollVariant];
+      if (!variant) return tex.chaser.gnollbrute.idle[frame4];
+      // Use walk frames when chaser is moving (cooldown was just reset)
+      const isMoving = enemy.moveCooldown === CHASER_MOVE_INTERVAL;
+      return isMoving ? variant.walk[frame4] : variant.idle[frame4];
+    }
+
+    if (enemy.type === "ranger") {
+      return tex.ranger.idle[frame4];
+    }
+
+    // Boss (golem — 6 frames)
+    const frame6 = animFrame(this.tickCount, 6, 3);
+    const healthRatio = enemy.health / enemy.maxHealth;
+    const isMoving = healthRatio < 0.5 && enemy.moveCooldown === BOSS_MOVE_INTERVAL;
+    return isMoving ? tex.boss.walk[frame6] : tex.boss.idle[frame6];
+  }
+
+  private getEnemyHealedTexture(enemy: Enemy): Texture {
+    const tex = this.textures;
+    const frame4 = animFrame(this.tickCount, 4, 6); // slower animation for healed
+
+    if (enemy.type === "chaser") {
+      const gender = enemy.healedGender as "elf_f" | "elf_m";
+      const elfFrames = tex.chaserHealed[gender];
+      return elfFrames ? elfFrames[frame4] : tex.chaserHealed.elf_f[frame4];
+    }
+
+    if (enemy.type === "ranger") {
+      return tex.rangerHealed[frame4];
+    }
+
+    // Boss healed (forest guardian)
+    return tex.bossHealed.idle[frame4];
   }
 
   private renderHUD(renderer: Renderer): void {
-    const barX = 8;
-    const barY = 4;
-    const barW = 120;
-    const barH = 12;
+    const tex = this.textures;
+    const startX = 8;
+    const startY = 4;
+    const heartSpacing = CELL_SIZE + 2; // full cell size + small gap
 
-    // Health bar
-    renderer.drawBar(
-      barX, barY, barW, barH,
-      this.player.health / this.player.maxHealth,
-      0xff4444, 0x333333
-    );
-    renderer.drawText("HP", barX + barW + 6, barY - 2, {
-      fontSize: 12,
-      color: 0xcccccc,
-    });
+    // Health hearts (rendered as full cell-sized sprites)
+    for (let i = 0; i < this.player.maxHealth; i++) {
+      const heartTex = i < this.player.health ? tex.ui.heartFull : tex.ui.heartEmpty;
+      const heartGridX = (startX + i * heartSpacing) / CELL_SIZE;
+      const heartGridY = startY / CELL_SIZE;
+      renderer.drawSprite(heartGridX, heartGridY, heartTex);
+    }
 
     // Rainbow power bar
-    const rbY = barY + barH + 4;
+    const rbY = startY + CELL_SIZE + 4;
+    const rbW = this.player.maxHealth * heartSpacing;
     const rbColorIdx = Math.floor(this.tickCount / 3) % RAINBOW_COLORS.length;
     renderer.drawBar(
-      barX, rbY, barW, barH,
+      startX, rbY, rbW, 8,
       this.rainbowPower,
       RAINBOW_COLORS[rbColorIdx], 0x222233
     );
-    renderer.drawText("Rainbow", barX + barW + 6, rbY - 2, {
-      fontSize: 12,
-      color: 0xcc88ff,
+    renderer.drawText("Rainbow", startX + rbW + 6, rbY - 2, {
+      fontSize: 10,
+      color: 0xd97dff,
     });
 
     // Room indicator
@@ -1255,95 +1282,176 @@ export class DungeonCrawlerScene implements Scene {
     const clearedCount = this.dungeon.rooms.filter((r) => r.cleared).length;
     renderer.drawText(
       `Room ${roomNum}/${totalRooms} (${clearedCount} cleared)`,
-      CANVAS_WIDTH - 8, barY - 2,
-      { fontSize: 12, color: 0xcccccc, anchor: 1 }
+      CANVAS_WIDTH - 8, startY - 2,
+      { fontSize: 12, color: COLOR_UI_TEXT, anchor: 1 }
     );
 
-    // Enemy count in current room
+    // Enemy count
     const activeCount = this.room.enemies.filter(
       (e) => e.state === "active"
     ).length;
     if (activeCount > 0) {
       renderer.drawText(
         `Enemies: ${activeCount}`,
-        CANVAS_WIDTH - 8, barY + 14,
-        { fontSize: 12, color: 0xcccccc, anchor: 1 }
+        CANVAS_WIDTH - 8, startY + 14,
+        { fontSize: 12, color: COLOR_UI_TEXT, anchor: 1 }
       );
     }
   }
 
   private renderStartScreen(renderer: Renderer): void {
-    renderer.drawRectAlpha(0, 0, GRID_SIZE, GRID_SIZE, 0x000000, 0.7);
+    renderer.drawRectAlpha(0, 0, GRID_SIZE, GRID_SIZE, 0x000000, 0.75);
     const cx = CANVAS_WIDTH / 2;
-    renderer.drawText("Rainbow Crawler", cx, 180, {
-      fontSize: 48,
-      color: 0xff77ff,
+    const tex = this.textures;
+
+    // Title in cycling rainbow colors
+    renderer.drawText("Rainbow Crawler", cx, 30, {
+      fontSize: 42,
+      color: RAINBOW_COLORS[Math.floor(this.tickCount / 3) % RAINBOW_COLORS.length],
       anchor: 0.5,
     });
-    renderer.drawText("Heal the corruption!", cx, 250, {
+
+    // Lore intro
+    const lore = [
+      "Darkness has swallowed the Enchanted Forest.",
+      "Its creatures — once gentle — now wander as corrupted shadows.",
+      "Only the siblings Sylvaria and Silvandor carry the ancient gift",
+      "of rainbow healing, a light that can restore what was lost.",
+      "Descend into the dungeons. Find the source. Heal your world.",
+    ];
+    const loreStart = 90;
+    for (let i = 0; i < lore.length; i++) {
+      renderer.drawText(lore[i], cx, loreStart + i * 18, {
+        fontSize: 12,
+        color: i === lore.length - 1 ? 0x9b7dff : 0xccbbdd,
+        anchor: 0.5,
+      });
+    }
+
+    // Character selection
+    renderer.drawText("Choose your hero:", cx, 210, {
+      fontSize: 16,
+      color: COLOR_UI_TEXT,
+      anchor: 0.5,
+    });
+
+    // Sylvaria (fairy, left)
+    const leftX = cx - 80;
+    const rightX = cx + 80;
+    const charY = 248;
+    const charGridX = leftX / CELL_SIZE;
+    const charGridY = charY / CELL_SIZE;
+    const charGridX2 = rightX / CELL_SIZE;
+
+    const fairyFrame = animFrame(this.tickCount, 4, 4);
+    renderer.drawSpriteScaled(charGridX - 0.5, charGridY, tex.player.fairy[fairyFrame], 2.0);
+    renderer.drawText("Sylvaria", leftX, charY + CELL_SIZE * 2.0 + 4, {
+      fontSize: 13,
+      color: this.playerCharacter === "fairy" ? 0xffd93d : COLOR_UI_DIM,
+      anchor: 0.5,
+    });
+
+    // Angrod (wizard, right)
+    const wizardFrame = animFrame(this.tickCount, 4, 4);
+    renderer.drawSpriteScaled(charGridX2 - 0.5, charGridY, tex.player.wizard[wizardFrame], 2.0);
+    renderer.drawText("Silvandor", rightX, charY + CELL_SIZE * 2.0 + 4, {
+      fontSize: 13,
+      color: this.playerCharacter === "wizard" ? 0xffd93d : COLOR_UI_DIM,
+      anchor: 0.5,
+    });
+
+    // Selection indicator
+    const selectedX = this.playerCharacter === "fairy" ? leftX : rightX;
+    renderer.drawText(">", selectedX - 28, charY + 8, {
       fontSize: 20,
-      color: 0xaaaaaa,
+      color: 0xffd93d,
+    });
+
+    // Controls
+    renderer.drawText("< / > to choose  |  SPACE to start", cx, 400, {
+      fontSize: 14,
+      color: COLOR_UI_DIM,
       anchor: 0.5,
     });
-    renderer.drawText("Press SPACE to start", cx, 340, {
-      fontSize: 24,
-      color: 0xcccccc,
-      anchor: 0.5,
-    });
-    renderer.drawText("WASD to move  |  SPACE to shoot", cx, 400, {
-      fontSize: 16,
-      color: 0x666666,
-      anchor: 0.5,
-    });
-    renderer.drawText("Hold SHIFT to sprint", cx, 430, {
-      fontSize: 16,
-      color: 0x666666,
+    renderer.drawText("WASD: Move  |  HOLD SPACE: Shoot  |  SHIFT: Sprint", cx, 428, {
+      fontSize: 11,
+      color: COLOR_UI_DIM,
       anchor: 0.5,
     });
   }
 
   private renderGameOverScreen(renderer: Renderer): void {
-    renderer.drawRectAlpha(0, 0, GRID_SIZE, GRID_SIZE, 0x000000, 0.7);
+    renderer.drawRectAlpha(0, 0, GRID_SIZE, GRID_SIZE, 0x000000, 0.75);
     const cx = CANVAS_WIDTH / 2;
-    renderer.drawText("Game Over", cx, 220, {
+
+    renderer.drawText("Game Over", cx, 200, {
       fontSize: 48,
-      color: 0xff4444,
+      color: 0xff6b6b,
       anchor: 0.5,
     });
-    renderer.drawText("Press SPACE to restart", cx, 320, {
-      fontSize: 24,
-      color: 0xaaaaaa,
+
+    const clearedCount = this.dungeon.rooms.filter((r) => r.cleared).length;
+    renderer.drawText(`Rooms explored: ${clearedCount}/${this.dungeon.rooms.length}`, cx, 280, {
+      fontSize: 16,
+      color: COLOR_UI_DIM,
+      anchor: 0.5,
+    });
+    renderer.drawText(`Enemies healed: ${this.healedEnemies}/${this.dungeon.totalEnemies}`, cx, 305, {
+      fontSize: 16,
+      color: COLOR_UI_DIM,
+      anchor: 0.5,
+    });
+    renderer.drawText(`Rainbow power: ${Math.floor(this.rainbowPower * 100)}%`, cx, 330, {
+      fontSize: 16,
+      color: 0x9b7dff,
+      anchor: 0.5,
+    });
+
+    renderer.drawText("Press SPACE to retry", cx, 400, {
+      fontSize: 22,
+      color: COLOR_UI_TEXT,
       anchor: 0.5,
     });
   }
 
   private renderWinScreen(renderer: Renderer): void {
-    renderer.drawRectAlpha(0, 0, GRID_SIZE, GRID_SIZE, 0x000000, 0.7);
+    renderer.drawRectAlpha(0, 0, GRID_SIZE, GRID_SIZE, 0x000000, 0.75);
     const cx = CANVAS_WIDTH / 2;
-    renderer.drawText("You Win!", cx, 200, {
-      fontSize: 48,
-      color: 0x77ff77,
+
+    // Rainbow-ish title
+    renderer.drawText("Darkness Healed!", cx, 180, {
+      fontSize: 44,
+      color: RAINBOW_COLORS[Math.floor(this.tickCount / 4) % RAINBOW_COLORS.length],
       anchor: 0.5,
     });
-    renderer.drawText("The corruption is healed.", cx, 270, {
-      fontSize: 20,
-      color: 0xaaaaaa,
-      anchor: 0.5,
-    });
+
+    // Show healed forest guardian
+    const guardianFrame = animFrame(this.tickCount, 4, 4);
+    renderer.drawSpriteScaled(
+      cx / CELL_SIZE - 0.5, 230 / CELL_SIZE,
+      this.textures.bossHealed.idle[guardianFrame], 2.0
+    );
+
     const clearedCount = this.dungeon.rooms.filter((r) => r.cleared).length;
-    renderer.drawText(`Rooms cleared: ${clearedCount}/${this.dungeon.rooms.length}`, cx, 310, {
+    renderer.drawText(`Rooms cleared: ${clearedCount}/${this.dungeon.rooms.length}`, cx, 290, {
       fontSize: 16,
-      color: 0x888888,
+      color: COLOR_UI_TEXT,
       anchor: 0.5,
     });
-    renderer.drawText(`Enemies healed: ${this.healedEnemies}/${this.dungeon.totalEnemies}`, cx, 335, {
+    renderer.drawText(`Enemies healed: ${this.healedEnemies}/${this.dungeon.totalEnemies}`, cx, 315, {
       fontSize: 16,
-      color: 0x888888,
+      color: COLOR_UI_TEXT,
       anchor: 0.5,
     });
-    renderer.drawText("Press SPACE to play again", cx, 400, {
-      fontSize: 24,
-      color: 0xcccccc,
+    renderer.drawText(`Rainbow power: ${Math.floor(this.rainbowPower * 100)}%`, cx, 340, {
+      fontSize: 16,
+      color: 0x9b7dff,
+      anchor: 0.5,
+    });
+
+    renderer.drawText("Press SPACE to play again", cx, 410, {
+      fontSize: 22,
+      color: COLOR_UI_TEXT,
       anchor: 0.5,
     });
   }
@@ -1351,15 +1459,30 @@ export class DungeonCrawlerScene implements Scene {
   onKeyDown(key: string): void {
     this.heldKeys.add(key);
 
-    if (KEY_DIRECTION[key]) {
+    if (this.state === "start") {
+      // Character selection with arrow keys
+      if (key === "ArrowLeft" || key === "KeyA") {
+        this.playerCharacter = "fairy";
+        return;
+      }
+      if (key === "ArrowRight" || key === "KeyD") {
+        this.playerCharacter = "wizard";
+        return;
+      }
+      if (key === "Space") {
+        this.state = "playing";
+        this.heldKeys.delete("Space");
+        return;
+      }
+      return;
+    }
+
+    if (KEY_DIRECTION[key] && !this.heldKeys.has("Space")) {
       this.player.facing = KEY_DIRECTION[key];
     }
 
     if (key === "Space") {
-      if (this.state === "start") {
-        this.state = "playing";
-        this.heldKeys.delete("Space");
-      } else if (this.state === "gameOver" || this.state === "win") {
+      if (this.state === "gameOver" || this.state === "win") {
         this.resetGame();
         this.state = "playing";
         this.heldKeys.delete("Space");

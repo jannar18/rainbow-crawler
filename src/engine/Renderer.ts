@@ -86,6 +86,69 @@ export class Renderer implements IRenderer {
     const s = new Sprite(texture);
     s.x = gridX * CELL_SIZE;
     s.y = gridY * CELL_SIZE;
+    s.width = CELL_SIZE;
+    s.height = CELL_SIZE;
+    this.drawContainer.addChild(s);
+  }
+
+  drawSpriteStatic(gridX: number, gridY: number, texture: Texture): void {
+    const s = new Sprite(texture);
+    s.x = gridX * CELL_SIZE;
+    s.y = gridY * CELL_SIZE;
+    s.width = CELL_SIZE;
+    s.height = CELL_SIZE;
+    this.staticContainer.addChild(s);
+  }
+
+  drawSpriteAlpha(
+    gridX: number,
+    gridY: number,
+    texture: Texture,
+    alpha: number
+  ): void {
+    const s = new Sprite(texture);
+    s.x = gridX * CELL_SIZE;
+    s.y = gridY * CELL_SIZE;
+    s.width = CELL_SIZE;
+    s.height = CELL_SIZE;
+    s.alpha = alpha;
+    this.drawContainer.addChild(s);
+  }
+
+  drawSpriteTinted(
+    gridX: number,
+    gridY: number,
+    texture: Texture,
+    tint: number,
+    alpha: number
+  ): void {
+    const s = new Sprite(texture);
+    s.x = gridX * CELL_SIZE;
+    s.y = gridY * CELL_SIZE;
+    s.width = CELL_SIZE;
+    s.height = CELL_SIZE;
+    s.tint = tint;
+    s.alpha = alpha;
+    this.drawContainer.addChild(s);
+  }
+
+  drawSpriteScaled(
+    gridX: number,
+    gridY: number,
+    texture: Texture,
+    scale: number,
+    alpha = 1,
+    tint?: number
+  ): void {
+    const s = new Sprite(texture);
+    const size = CELL_SIZE * scale;
+    const offset = (CELL_SIZE - size) / 2;
+    s.x = gridX * CELL_SIZE + offset;
+    s.y = gridY * CELL_SIZE + offset;
+    s.width = size;
+    s.height = size;
+    s.alpha = alpha;
+    if (tint !== undefined) s.tint = tint;
     this.drawContainer.addChild(s);
   }
 
