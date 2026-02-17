@@ -166,7 +166,7 @@ export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
     roomCountMin: 7, roomCountMax: 9,
     enemiesPerRoomMin: 4, enemiesPerRoomMax: 6,
     pickupsPerRoom: 1,
-    enemyHealth: 2, chaserMoveInterval: 1,
+    enemyHealth: 2, chaserMoveInterval: 2,
     rangerFireInterval: 5, rangerShotSpeed: 1,
     bossHealth: 8, bossFireInterval: 4, bossMoveInterval: 2, bossShotSpeed: 2,
     bossPauseCycle: 5, bossPauseDuration: 6,
@@ -191,7 +191,7 @@ export const ALL_DIFFICULTIES: Difficulty[] = ["easy", "normal", "hard", "nightm
 // --- Constants ---
 
 export const PLAYER_MAX_HEALTH = 5;
-export const SHOOT_COOLDOWN = 3;
+export const SHOOT_COOLDOWN = 2;
 export const BEAM_SPEED = 2;
 export const I_FRAME_DURATION = 4;
 
