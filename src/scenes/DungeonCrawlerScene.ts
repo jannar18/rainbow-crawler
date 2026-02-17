@@ -57,6 +57,7 @@ export class DungeonCrawlerScene implements Scene {
   private selectedDifficulty: Difficulty = "easy";
   private difficultyConfig: DifficultyConfig = DIFFICULTY_PRESETS.easy;
   private activeModifiers: NightmareModifier[] = [];
+  private startMenuFocus: "hero" | "difficulty" = "hero";
   private projectiles: Projectile[] = [];
   private dungeon!: Dungeon;
   private heldKeys = new Set<string>();
@@ -710,43 +711,6 @@ export class DungeonCrawlerScene implements Scene {
       if (enemy.state === "active") {
         const frame = this.getEnemyActiveTexture(enemy);
         renderer.drawSpriteScaled(enemy.pos.x, enemy.pos.y, frame, sc);
-        // Boss HP bar with rainbow power visibility
-        if (enemy.type === "boss") {
-          const barW = CELL_SIZE * sc;
-          const barH = 4;
-          const barX = enemy.pos.x * CELL_SIZE + (CELL_SIZE - barW) / 2;
-          const barY = enemy.pos.y * CELL_SIZE + (CELL_SIZE - CELL_SIZE * sc) / 2 - barH - 2;
-          const effectiveMax = this.getBossEffectiveMaxHealth();
-          const colorIdx = Math.floor(this.tickCount / 3) % RAINBOW_COLORS.length;
-
-          // Draw full background
-          renderer.drawBar(barX, barY, barW, barH, 0, 0x000000, 0x222233);
-
-          // Draw depleted section (portion removed by rainbow power) in dim purple
-          if (effectiveMax < enemy.maxHealth) {
-            const depletedRatio = 1 - effectiveMax / enemy.maxHealth;
-            const depletedX = barX + barW * (1 - depletedRatio);
-            renderer.drawBar(depletedX, barY, barW * depletedRatio, barH, 1, 0x443355, 0x443355);
-          }
-
-          // Draw effective HP fill
-          const threshold = enemy.maxHealth - effectiveMax;
-          const effectiveHealth = Math.max(0, enemy.health - threshold);
-          const fill = effectiveMax > 0 ? effectiveHealth / effectiveMax : 0;
-          const fillWidth = barW * (effectiveMax / enemy.maxHealth);
-          renderer.drawBar(barX, barY, fillWidth, barH, fill, RAINBOW_COLORS[colorIdx], 0x222233);
-
-          // Boss weakened popup
-          if (this.bossWeakenedPopupTimer > 0) {
-            const popupAlpha = Math.min(1, this.bossWeakenedPopupTimer / 10);
-            const popupY = barY - 14 - (20 - this.bossWeakenedPopupTimer) * 0.5;
-            renderer.drawText("Rainbow Power weakened the boss!", barX + barW / 2, popupY, {
-              fontSize: 10,
-              color: RAINBOW_COLORS[colorIdx],
-              anchor: 0.5,
-            });
-          }
-        }
       } else if (enemy.state === "calm") {
         // Show healed form at reduced alpha (pulsing)
         const alpha = 0.5 + 0.3 * (enemy.stateTimer / this.difficultyConfig.calmDuration);
@@ -896,6 +860,49 @@ export class DungeonCrawlerScene implements Scene {
         { fontSize: 12, color: COLOR_UI_TEXT, anchor: 1 }
       );
     }
+
+    // Boss HP bar (top-center, only in boss room with active boss)
+    const boss = this.room.enemies.find((e) => e.type === "boss" && e.state === "active");
+    if (boss) {
+      const cx = CANVAS_WIDTH / 2;
+      const barW = CANVAS_WIDTH * 0.55;
+      const barH = 10;
+      const barX = cx - barW / 2;
+      const barY = CANVAS_WIDTH - 28;
+      const colorIdx = Math.floor(this.tickCount / 3) % RAINBOW_COLORS.length;
+      const effectiveMax = this.getBossEffectiveMaxHealth();
+
+      // Title
+      const bossLabel = "Corrupted Troll";
+      renderer.drawText(bossLabel, cx, barY - 14, {
+        fontSize: 13, color: 0xff8866, anchor: 0.5,
+      });
+
+      // Full background
+      renderer.drawBar(barX, barY, barW, barH, 0, 0x000000, 0x222233);
+
+      // Depleted section (rainbow power reduction) in dim purple
+      if (effectiveMax < boss.maxHealth) {
+        const depletedRatio = 1 - effectiveMax / boss.maxHealth;
+        const depletedX = barX + barW * (1 - depletedRatio);
+        renderer.drawBar(depletedX, barY, barW * depletedRatio, barH, 1, 0x443355, 0x443355);
+      }
+
+      // Effective HP fill
+      const threshold = boss.maxHealth - effectiveMax;
+      const effectiveHealth = Math.max(0, boss.health - threshold);
+      const fill = effectiveMax > 0 ? effectiveHealth / effectiveMax : 0;
+      const fillWidth = barW * (effectiveMax / boss.maxHealth);
+      renderer.drawBar(barX, barY, fillWidth, barH, fill, RAINBOW_COLORS[colorIdx], 0x222233);
+
+      // Boss weakened popup
+      if (this.bossWeakenedPopupTimer > 0) {
+        const popupY = barY - 32 - (20 - this.bossWeakenedPopupTimer) * 0.5;
+        renderer.drawText("Rainbow Power weakened the boss!", cx, popupY, {
+          fontSize: 12, color: RAINBOW_COLORS[colorIdx], anchor: 0.5,
+        });
+      }
+    }
   }
 
   private renderStartScreen(renderer: Renderer): void {
@@ -928,9 +935,10 @@ export class DungeonCrawlerScene implements Scene {
     }
 
     // Character selection
+    const heroFocused = this.startMenuFocus === "hero";
     renderer.drawText("Choose your hero:", cx, 210, {
       fontSize: 16,
-      color: COLOR_UI_TEXT,
+      color: heroFocused ? COLOR_UI_TEXT : COLOR_UI_DIM,
       anchor: 0.5,
     });
 
@@ -959,18 +967,21 @@ export class DungeonCrawlerScene implements Scene {
       anchor: 0.5,
     });
 
-    // Selection indicator
-    const selectedX = this.playerCharacter === "fairy" ? leftX : rightX;
-    renderer.drawText(">", selectedX - 28, charY + 8, {
-      fontSize: 20,
-      color: 0xffd93d,
-    });
+    // Selection indicator (only when hero row is focused)
+    if (heroFocused) {
+      const selectedX = this.playerCharacter === "fairy" ? leftX : rightX;
+      renderer.drawText(">", selectedX - 28, charY + 8, {
+        fontSize: 20,
+        color: 0xffd93d,
+      });
+    }
 
     // Difficulty selector
+    const diffFocused = this.startMenuFocus === "difficulty";
     const diffY = 370;
     renderer.drawText("Difficulty:", cx, diffY, {
       fontSize: 16,
-      color: COLOR_UI_TEXT,
+      color: diffFocused ? COLOR_UI_TEXT : COLOR_UI_DIM,
       anchor: 0.5,
     });
 
@@ -983,7 +994,7 @@ export class DungeonCrawlerScene implements Scene {
       nightmare: 0xff3333,
     };
     const preset = DIFFICULTY_PRESETS[this.selectedDifficulty];
-    const arrowColor = 0xffd93d;
+    const arrowColor = diffFocused ? 0xffd93d : 0x665577;
 
     // Left/right arrows
     if (diffIdx > 0) {
@@ -1010,13 +1021,8 @@ export class DungeonCrawlerScene implements Scene {
     }
 
     // Controls
-    renderer.drawText("< / > choose hero & difficulty  |  SPACE to start", cx, 460, {
-      fontSize: 13,
-      color: COLOR_UI_DIM,
-      anchor: 0.5,
-    });
-    renderer.drawText("Up / Down to change difficulty", cx, 480, {
-      fontSize: 11,
+    renderer.drawText("< / > to choose hero & difficulty  |  SPACE to start", cx, 460, {
+      fontSize: 12,
       color: COLOR_UI_DIM,
       anchor: 0.5,
     });
@@ -1135,24 +1141,32 @@ export class DungeonCrawlerScene implements Scene {
     this.heldKeys.add(key);
 
     if (this.state === "start") {
-      // Character selection with left/right
+      // Tab / Up / Down to switch focus between hero and difficulty
+      if (key === "Tab" || key === "ArrowDown" || key === "KeyS") {
+        this.startMenuFocus = this.startMenuFocus === "hero" ? "difficulty" : "hero";
+        return;
+      }
+      if (key === "ArrowUp" || key === "KeyW") {
+        this.startMenuFocus = this.startMenuFocus === "difficulty" ? "hero" : "difficulty";
+        return;
+      }
+      // Left/Right to cycle within focused row
       if (key === "ArrowLeft" || key === "KeyA") {
-        this.playerCharacter = "fairy";
+        if (this.startMenuFocus === "hero") {
+          this.playerCharacter = "fairy";
+        } else {
+          const idx = ALL_DIFFICULTIES.indexOf(this.selectedDifficulty);
+          if (idx > 0) this.selectedDifficulty = ALL_DIFFICULTIES[idx - 1];
+        }
         return;
       }
       if (key === "ArrowRight" || key === "KeyD") {
-        this.playerCharacter = "wizard";
-        return;
-      }
-      // Difficulty selection with up/down
-      if (key === "ArrowUp" || key === "KeyW") {
-        const idx = ALL_DIFFICULTIES.indexOf(this.selectedDifficulty);
-        if (idx > 0) this.selectedDifficulty = ALL_DIFFICULTIES[idx - 1];
-        return;
-      }
-      if (key === "ArrowDown" || key === "KeyS") {
-        const idx = ALL_DIFFICULTIES.indexOf(this.selectedDifficulty);
-        if (idx < ALL_DIFFICULTIES.length - 1) this.selectedDifficulty = ALL_DIFFICULTIES[idx + 1];
+        if (this.startMenuFocus === "hero") {
+          this.playerCharacter = "wizard";
+        } else {
+          const idx = ALL_DIFFICULTIES.indexOf(this.selectedDifficulty);
+          if (idx < ALL_DIFFICULTIES.length - 1) this.selectedDifficulty = ALL_DIFFICULTIES[idx + 1];
+        }
         return;
       }
       if (key === "Space") {
