@@ -61,6 +61,7 @@ export interface Enemy {
   state: EnemyState;
   health: number;
   stateTimer: number;
+  shotsSinceLastPause: number;
   moveCooldown: number;
   shootCooldown: number;
   maxHealth: number;

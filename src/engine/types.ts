@@ -25,6 +25,13 @@ export interface Renderer {
     heightCells: number,
     color: number
   ): void;
+  drawRectStatic(
+    gridX: number,
+    gridY: number,
+    widthCells: number,
+    heightCells: number,
+    color: number
+  ): void;
   drawRectAlpha(
     gridX: number,
     gridY: number,
@@ -75,13 +82,6 @@ export interface Renderer {
   ): void;
   clear(): void;
   clearStatic(): void;
-  drawRectStatic(
-    gridX: number,
-    gridY: number,
-    widthCells: number,
-    heightCells: number,
-    color: number
-  ): void;
   readonly stage: import("pixi.js").Container;
 }
 

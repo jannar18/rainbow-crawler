@@ -467,9 +467,9 @@ export class DungeonCrawlerScene implements Scene {
     if (enemy.shootCooldown > 0) return;
 
     // Periodic pause: after N shots, take a breather
-    enemy.stateTimer++;
-    if (enemy.stateTimer >= this.difficultyConfig.bossPauseCycle) {
-      enemy.stateTimer = 0;
+    enemy.shotsSinceLastPause++;
+    if (enemy.shotsSinceLastPause >= this.difficultyConfig.bossPauseCycle) {
+      enemy.shotsSinceLastPause = 0;
       enemy.shootCooldown = this.difficultyConfig.bossPauseDuration;
       return;
     }
@@ -826,9 +826,7 @@ export class DungeonCrawlerScene implements Scene {
     // Health hearts (rendered as full cell-sized sprites)
     for (let i = 0; i < this.player.maxHealth; i++) {
       const heartTex = i < this.player.health ? tex.ui.heartFull : tex.ui.heartEmpty;
-      const heartGridX = (startX + i * heartSpacing) / CELL_SIZE;
-      const heartGridY = startY / CELL_SIZE;
-      renderer.drawSprite(heartGridX, heartGridY, heartTex);
+      renderer.drawSpritePixel(startX + i * heartSpacing, startY, heartTex, CELL_SIZE);
     }
 
     // Rainbow power bar
@@ -876,7 +874,7 @@ export class DungeonCrawlerScene implements Scene {
       const colorIdx = Math.floor(this.tickCount / 3) % RAINBOW_COLORS.length;
       const effectiveMax = this.getBossEffectiveMaxHealth();
       const threshold = boss.maxHealth - effectiveMax;
-      const effectiveHealth = Math.max(0, boss.health - threshold);
+      const remainingHits = Math.max(0, boss.health - threshold);
 
       // Title
       renderer.drawText("Corrupted Troll", cx, titleY, {
@@ -885,15 +883,15 @@ export class DungeonCrawlerScene implements Scene {
 
       // Draw hearts using same sprites as player hearts
       const heartSize = 20;
-      const heartSpacing = heartSize + 2;
-      const totalWidth = boss.maxHealth * heartSpacing - 2;
+      const bossHeartSpacing = heartSize + 2;
+      const totalWidth = boss.maxHealth * bossHeartSpacing - 2;
       const hStartX = cx - totalWidth / 2;
 
       for (let i = 0; i < boss.maxHealth; i++) {
-        const hx = hStartX + i * heartSpacing;
+        const hx = hStartX + i * bossHeartSpacing;
         if (i >= effectiveMax) {
           renderer.drawSpritePixel(hx, heartsY, tex.ui.heartEmpty, heartSize, 0.3);
-        } else if (i < effectiveHealth) {
+        } else if (i < remainingHits) {
           renderer.drawSpritePixel(hx, heartsY, tex.ui.heartFull, heartSize);
         } else {
           renderer.drawSpritePixel(hx, heartsY, tex.ui.heartEmpty, heartSize);
