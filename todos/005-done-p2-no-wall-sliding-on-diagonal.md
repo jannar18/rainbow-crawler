@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 priority: p2
 issue_id: "005"
 tags: [gameplay-feel, phase2]

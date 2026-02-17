@@ -1,573 +1,51 @@
 import type { Texture } from "pixi.js";
 import type { Scene, GameContext, Renderer } from "../engine/types.js";
 import { CANVAS_WIDTH, CELL_SIZE, GRID_SIZE } from "../engine/types.js";
+import { generateDungeon } from "./dungeon-gen.js";
+import {
+  PLAYER_MAX_HEALTH,
+  SHOOT_COOLDOWN,
+  BEAM_SPEED,
+  I_FRAME_DURATION,
+  CHASER_MOVE_INTERVAL,
+  RANGER_FIRE_INTERVAL,
+  RANGER_SHOT_SPEED,
+  CALM_DURATION,
+  DISSOLVE_DURATION,
+  BOSS_BASE_HEALTH,
+  BOSS_FIRE_INTERVAL,
+  BOSS_MOVE_INTERVAL,
+  BOSS_SHOT_SPEED,
+  DELTA,
+  OPPOSITE_DIR,
+  RAINBOW_COLORS,
+  RAINBOW_FLOOR_COLORS,
+  COLOR_UI_TEXT,
+  COLOR_UI_DIM,
+  ENTITY_SCALE,
+  MOVE_KEY_DIRECTION,
+  AIM_KEY_DIRECTION,
+  animFrame,
+  doorPos,
+  entryPos,
+} from "./dungeon-types.js";
+import type {
+  GameTextures,
+  Point,
+  Direction,
+  GameState,
+  EnemyState,
+  PlayerCharacter,
+  Player,
+  Enemy,
+  Projectile,
+  Room,
+  Dungeon,
+} from "./dungeon-types.js";
 
-// --- Texture types ---
+export type { GameTextures } from "./dungeon-types.js";
 
-export interface GameTextures {
-  player: {
-    fairy: Texture[];
-    wizard: Texture[];
-  };
-  chaser: Record<string, { idle: Texture[]; walk: Texture[] }>;
-  chaserHealed: {
-    elf_f: Texture[];
-    elf_m: Texture[];
-  };
-  ranger: { idle: Texture[]; run: Texture[] };
-  rangerHealed: Texture[];
-  boss: { idle: Texture[]; walk: Texture[] };
-  bossHealed: { idle: Texture[]; walk: Texture[] };
-  tiles: {
-    wallMid: Texture;
-    jungleWalls: Texture[];
-    floors: Texture[];
-    doorClosed: Texture;
-  };
-  ui: {
-    heartFull: Texture;
-    heartHalf: Texture;
-    heartEmpty: Texture;
-  };
-}
-
-// --- Types ---
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-type Direction = "up" | "down" | "left" | "right";
-type CellType = "wall" | "floor" | "door";
-type GameState = "start" | "playing" | "gameOver" | "win";
-type EnemyType = "chaser" | "ranger" | "boss";
-type EnemyState = "active" | "calm" | "dissolving" | "healed";
-type PlayerCharacter = "fairy" | "wizard";
-
-const GNOLL_VARIANTS = ["gnollbrute", "gnollshaman", "gnollscout"] as const;
-const ELF_GENDERS = ["elf_f", "elf_m"] as const;
-
-interface Player {
-  pos: Point;
-  facing: Direction;
-  aimDirection: Direction;
-  health: number;
-  maxHealth: number;
-  iFrames: number;
-  shootCooldown: number;
-  sprinting: boolean;
-}
-
-interface Enemy {
-  pos: Point;
-  type: EnemyType;
-  state: EnemyState;
-  health: number;
-  stateTimer: number;
-  moveCooldown: number;
-  shootCooldown: number;
-  maxHealth: number;
-  gnollVariant: string; // chaser: which gnoll skin
-  healedGender: string; // chaser: which elf gender when healed
-}
-
-interface Projectile {
-  pos: Point;
-  direction: Direction;
-  speed: number;
-  isPlayerBeam: boolean;
-}
-
-interface Pickup {
-  pos: Point;
-  type: "health";
-  collected: boolean;
-}
-
-interface Room {
-  grid: CellType[][];
-  enemies: Enemy[];
-  pickups: Pickup[];
-  connections: Map<Direction, number>;
-  cleared: boolean;
-  playerSpawn: Point;
-}
-
-interface Dungeon {
-  rooms: Room[];
-  currentRoom: number;
-  bossRoom: number;
-  totalEnemies: number;
-}
-
-// --- Constants ---
-
-const PLAYER_MAX_HEALTH = 5;
-const SHOOT_COOLDOWN = 3;
-const BEAM_SPEED = 2;
-const I_FRAME_DURATION = 4;
-
-const ENEMY_HEALTH = 1;
-const CHASER_MOVE_INTERVAL = 3;
-const RANGER_FIRE_INTERVAL = 7;
-const RANGER_SHOT_SPEED = 1;
-const CALM_DURATION = 6;
-const DISSOLVE_DURATION = 4;
-
-const BOSS_BASE_HEALTH = 3;
-const BOSS_FIRE_INTERVAL = 7;
-const BOSS_MOVE_INTERVAL = 4;
-const BOSS_SHOT_SPEED = 1;
-
-const DELTA: Record<Direction, Point> = {
-  up: { x: 0, y: -1 },
-  down: { x: 0, y: 1 },
-  left: { x: -1, y: 0 },
-  right: { x: 1, y: 0 },
-};
-
-const OPPOSITE_DIR: Record<Direction, Direction> = {
-  up: "down",
-  down: "up",
-  left: "right",
-  right: "left",
-};
-
-// Soft rainbow palette (from art direction brainstorm)
-const RAINBOW_COLORS = [
-  0xff6b6b, 0xffa06b, 0xffd93d, 0x6bcf7f, 0x6bb5ff, 0x9b7dff, 0xd97dff,
-];
-
-// Enchanted forest pastel floor palette (warm mossy tones)
-const RAINBOW_FLOOR_COLORS = [
-  0xc4ddb2, 0xa8d4a0, 0xd4e8b8, 0xf0e6b0, 0xe8d0a8, 0xf2c8c0, 0xb8d8c4,
-];
-
-// Environment colors
-
-// UI colors
-const COLOR_UI_TEXT = 0xffeedd;
-const COLOR_UI_DIM = 0x9988aa;
 const COLOR_ENEMY_SHOT = 0x884422;
-
-// Entity sprite scale (1.0 = one cell, 1.4 = 40% bigger, centered)
-const ENTITY_SCALE = 1.4;
-
-// --- Key mappings ---
-
-// WASD = movement, Arrows = aim
-const MOVE_KEY_DIRECTION: Record<string, Direction> = {
-  KeyW: "up",
-  KeyS: "down",
-  KeyA: "left",
-  KeyD: "right",
-};
-
-const AIM_KEY_DIRECTION: Record<string, Direction> = {
-  ArrowUp: "up",
-  ArrowDown: "down",
-  ArrowLeft: "left",
-  ArrowRight: "right",
-};
-
-// --- Animation helper ---
-
-function animFrame(tick: number, frameCount: number, ticksPerFrame: number): number {
-  return Math.floor(tick / ticksPerFrame) % frameCount;
-}
-
-// --- Simple seeded RNG ---
-
-function makeRng(seed: number) {
-  let s = seed;
-  return {
-    next(): number {
-      s = (s * 1664525 + 1013904223) & 0xffffffff;
-      return (s >>> 0) / 0x100000000;
-    },
-    nextInt(min: number, max: number): number {
-      return min + Math.floor(this.next() * (max - min + 1));
-    },
-    shuffle<T>(arr: T[]): void {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(this.next() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-    },
-  };
-}
-
-// --- Door positions ---
-
-function doorPos(dir: Direction): Point {
-  const mid = Math.floor(GRID_SIZE / 2);
-  switch (dir) {
-    case "up": return { x: mid, y: 0 };
-    case "down": return { x: mid, y: GRID_SIZE - 1 };
-    case "left": return { x: 0, y: mid };
-    case "right": return { x: GRID_SIZE - 1, y: mid };
-  }
-}
-
-function entryPos(dir: Direction): Point {
-  const door = doorPos(dir);
-  const inward = DELTA[OPPOSITE_DIR[dir]];
-  return { x: door.x + inward.x, y: door.y + inward.y };
-}
-
-// --- Dungeon generation ---
-
-function generateDungeon(): Dungeon {
-  const rng = makeRng(Date.now());
-  const numRooms = rng.nextInt(5, 7);
-  const dirs: Direction[] = ["up", "down", "left", "right"];
-
-  interface RoomNode {
-    id: number;
-    connections: Map<Direction, number>;
-  }
-
-  const nodes: RoomNode[] = [];
-  for (let i = 0; i < numRooms; i++) {
-    nodes.push({ id: i, connections: new Map() });
-  }
-
-  for (let i = 0; i < numRooms - 1; i++) {
-    const availDirs = dirs.filter((d) => !nodes[i].connections.has(d));
-    if (availDirs.length === 0) break;
-    rng.shuffle(availDirs);
-    const dir = availDirs[0];
-    nodes[i].connections.set(dir, i + 1);
-    nodes[i + 1].connections.set(OPPOSITE_DIR[dir], i);
-  }
-
-  const bossRoom = numRooms - 1;
-
-  const rooms: Room[] = [];
-  let totalEnemies = 0;
-
-  for (let i = 0; i < numRooms; i++) {
-    const room = generateRoom(rng, nodes[i].connections);
-    rooms.push(room);
-  }
-
-  for (let i = 0; i < numRooms; i++) {
-    const room = rooms[i];
-    const floorCells = getFloorCells(room);
-
-    if (i === 0) {
-      placePickups(rng, room, floorCells, 1);
-      room.cleared = true;
-    } else if (i === bossRoom) {
-      const bossPos = pickSpawnPos(rng, floorCells, room);
-      if (bossPos) {
-        room.enemies.push({
-          pos: bossPos,
-          type: "boss",
-          state: "active",
-          health: BOSS_BASE_HEALTH,
-          maxHealth: BOSS_BASE_HEALTH,
-          stateTimer: 0,
-          moveCooldown: BOSS_MOVE_INTERVAL,
-          shootCooldown: BOSS_FIRE_INTERVAL,
-          gnollVariant: "",
-          healedGender: "",
-        });
-        totalEnemies++;
-      }
-    } else {
-      const enemyCount = rng.nextInt(2, 4);
-      for (let e = 0; e < enemyCount; e++) {
-        const pos = pickSpawnPos(rng, floorCells, room);
-        if (!pos) break;
-        const type: EnemyType = rng.next() < 0.5 ? "chaser" : "ranger";
-        room.enemies.push({
-          pos,
-          type,
-          state: "active",
-          health: ENEMY_HEALTH,
-          maxHealth: ENEMY_HEALTH,
-          stateTimer: 0,
-          moveCooldown: type === "chaser" ? CHASER_MOVE_INTERVAL : 0,
-          shootCooldown: type === "ranger" ? RANGER_FIRE_INTERVAL : 0,
-          gnollVariant: GNOLL_VARIANTS[rng.nextInt(0, 2)],
-          healedGender: ELF_GENDERS[rng.nextInt(0, 1)],
-        });
-        totalEnemies++;
-      }
-      placePickups(rng, room, floorCells, rng.nextInt(1, 2));
-    }
-
-    room.playerSpawn = findPlayerSpawn(room);
-  }
-
-  return { rooms, currentRoom: 0, bossRoom, totalEnemies };
-}
-
-function generateRoom(
-  rng: ReturnType<typeof makeRng>,
-  connections: Map<Direction, number>
-): Room {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const grid: CellType[][] = [];
-
-    for (let y = 0; y < GRID_SIZE; y++) {
-      const row: CellType[] = [];
-      for (let x = 0; x < GRID_SIZE; x++) {
-        row.push("wall");
-      }
-      grid.push(row);
-    }
-
-    const areaW = rng.nextInt(10, 16);
-    const areaH = rng.nextInt(10, 16);
-    const startX = Math.floor((GRID_SIZE - areaW) / 2);
-    const startY = Math.floor((GRID_SIZE - areaH) / 2);
-
-    for (let y = startY; y < startY + areaH; y++) {
-      for (let x = startX; x < startX + areaW; x++) {
-        grid[y][x] = "floor";
-      }
-    }
-
-    const numObstacles = rng.nextInt(2, 4);
-    for (let o = 0; o < numObstacles; o++) {
-      const obstacleType = rng.nextInt(0, 2);
-      if (obstacleType === 0) {
-        const px = rng.nextInt(startX + 2, startX + areaW - 4);
-        const py = rng.nextInt(startY + 2, startY + areaH - 4);
-        for (let dy = 0; dy < 2; dy++) {
-          for (let dx = 0; dx < 2; dx++) {
-            grid[py + dy][px + dx] = "wall";
-          }
-        }
-      } else if (obstacleType === 1) {
-        const len = rng.nextInt(3, 5);
-        const wx = rng.nextInt(startX + 2, startX + areaW - len - 2);
-        const wy = rng.nextInt(startY + 2, startY + areaH - 3);
-        for (let i = 0; i < len; i++) {
-          grid[wy][wx + i] = "wall";
-        }
-      } else {
-        const len = rng.nextInt(3, 5);
-        const wx = rng.nextInt(startX + 2, startX + areaW - 3);
-        const wy = rng.nextInt(startY + 2, startY + areaH - len - 2);
-        for (let i = 0; i < len; i++) {
-          grid[wy + i][wx] = "wall";
-        }
-      }
-    }
-
-    for (const [dir] of connections) {
-      const door = doorPos(dir);
-      grid[door.y][door.x] = "door";
-      carveCorridor(grid, door, dir, startX, startY, startX + areaW - 1, startY + areaH - 1);
-    }
-
-    const centerX = Math.floor(GRID_SIZE / 2);
-    const centerY = Math.floor(GRID_SIZE / 2);
-    let seedCell: Point | null = null;
-    for (let r = 0; r < GRID_SIZE; r++) {
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          const cx = centerX + dx;
-          const cy = centerY + dy;
-          if (cx >= 0 && cx < GRID_SIZE && cy >= 0 && cy < GRID_SIZE) {
-            if (grid[cy][cx] === "floor" || grid[cy][cx] === "door") {
-              seedCell = { x: cx, y: cy };
-            }
-          }
-          if (seedCell) break;
-        }
-        if (seedCell) break;
-      }
-      if (seedCell) break;
-    }
-
-    if (!seedCell) continue;
-
-    const reachable = floodFill(grid, seedCell);
-    let allReachable = true;
-    for (let y = 0; y < GRID_SIZE; y++) {
-      for (let x = 0; x < GRID_SIZE; x++) {
-        if ((grid[y][x] === "floor" || grid[y][x] === "door") && !reachable[y][x]) {
-          allReachable = false;
-          break;
-        }
-      }
-      if (!allReachable) break;
-    }
-
-    if (allReachable) {
-      return {
-        grid,
-        enemies: [],
-        pickups: [],
-        connections,
-        cleared: false,
-        playerSpawn: { x: centerX, y: centerY },
-      };
-    }
-  }
-
-  return generateFallbackRoom(connections);
-}
-
-function carveCorridor(
-  grid: CellType[][],
-  door: Point,
-  dir: Direction,
-  areaX1: number,
-  areaY1: number,
-  areaX2: number,
-  areaY2: number
-): void {
-  const inward = OPPOSITE_DIR[dir];
-  const d = DELTA[inward];
-  let x = door.x + d.x;
-  let y = door.y + d.y;
-
-  while (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-    if (grid[y][x] === "floor") break;
-    grid[y][x] = "floor";
-    if (x >= areaX1 && x <= areaX2 && y >= areaY1 && y <= areaY2) break;
-    x += d.x;
-    y += d.y;
-  }
-}
-
-function floodFill(grid: CellType[][], start: Point): boolean[][] {
-  const visited: boolean[][] = [];
-  for (let y = 0; y < GRID_SIZE; y++) {
-    visited.push(new Array(GRID_SIZE).fill(false));
-  }
-
-  const queue: Point[] = [start];
-  visited[start.y][start.x] = true;
-
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
-    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-      const nx = cur.x + dx;
-      const ny = cur.y + dy;
-      if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
-      if (visited[ny][nx]) continue;
-      if (grid[ny][nx] === "wall") continue;
-      visited[ny][nx] = true;
-      queue.push({ x: nx, y: ny });
-    }
-  }
-
-  return visited;
-}
-
-function generateFallbackRoom(connections: Map<Direction, number>): Room {
-  const grid: CellType[][] = [];
-  for (let y = 0; y < GRID_SIZE; y++) {
-    const row: CellType[] = [];
-    for (let x = 0; x < GRID_SIZE; x++) {
-      if (x === 0 || x === GRID_SIZE - 1 || y === 0 || y === GRID_SIZE - 1) {
-        row.push("wall");
-      } else {
-        row.push("floor");
-      }
-    }
-    grid.push(row);
-  }
-
-  for (const [dir] of connections) {
-    const door = doorPos(dir);
-    grid[door.y][door.x] = "door";
-  }
-
-  grid[5][5] = "wall";
-  grid[5][6] = "wall";
-  grid[6][5] = "wall";
-  grid[6][6] = "wall";
-
-  grid[13][13] = "wall";
-  grid[13][14] = "wall";
-  grid[14][13] = "wall";
-  grid[14][14] = "wall";
-
-  return {
-    grid,
-    enemies: [],
-    pickups: [],
-    connections,
-    cleared: false,
-    playerSpawn: { x: 10, y: 10 },
-  };
-}
-
-function getFloorCells(room: Room): Point[] {
-  const cells: Point[] = [];
-  for (let y = 2; y < GRID_SIZE - 2; y++) {
-    for (let x = 2; x < GRID_SIZE - 2; x++) {
-      if (room.grid[y][x] === "floor") {
-        cells.push({ x, y });
-      }
-    }
-  }
-  return cells;
-}
-
-function pickSpawnPos(
-  rng: ReturnType<typeof makeRng>,
-  floorCells: Point[],
-  room: Room
-): Point | null {
-  const candidates = floorCells.filter((c) => {
-    for (const [dir] of room.connections) {
-      const door = doorPos(dir);
-      if (Math.abs(c.x - door.x) + Math.abs(c.y - door.y) < 3) return false;
-    }
-    for (const e of room.enemies) {
-      if (e.pos.x === c.x && e.pos.y === c.y) return false;
-    }
-    for (const p of room.pickups) {
-      if (p.pos.x === c.x && p.pos.y === c.y) return false;
-    }
-    return true;
-  });
-
-  if (candidates.length === 0) return null;
-  return { ...candidates[rng.nextInt(0, candidates.length - 1)] };
-}
-
-function placePickups(
-  rng: ReturnType<typeof makeRng>,
-  room: Room,
-  floorCells: Point[],
-  count: number
-): void {
-  for (let i = 0; i < count; i++) {
-    const pos = pickSpawnPos(rng, floorCells, room);
-    if (pos) {
-      room.pickups.push({ pos, type: "health", collected: false });
-    }
-  }
-}
-
-function findPlayerSpawn(room: Room): Point {
-  const cx = Math.floor(GRID_SIZE / 2);
-  const cy = Math.floor(GRID_SIZE / 2);
-  for (let r = 0; r < GRID_SIZE; r++) {
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        const x = cx + dx;
-        const y = cy + dy;
-        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-          if (room.grid[y][x] === "floor") {
-            return { x, y };
-          }
-        }
-      }
-    }
-  }
-  return { x: cx, y: cy };
-}
 
 // --- Scene ---
 
@@ -600,7 +78,6 @@ export class DungeonCrawlerScene implements Scene {
     this.dungeon = generateDungeon();
     this.player = {
       pos: { ...this.dungeon.rooms[0].playerSpawn },
-      facing: "right",
       aimDirection: "right",
       health: PLAYER_MAX_HEALTH,
       maxHealth: PLAYER_MAX_HEALTH,
@@ -641,6 +118,15 @@ export class DungeonCrawlerScene implements Scene {
         if (canMove) {
           this.player.pos.x = nx;
           this.player.pos.y = ny;
+        } else if (isDiagonal) {
+          // Wall-slide: try each axis independently
+          if (this.isWalkable(this.player.pos.x + dx, this.player.pos.y)) {
+            this.player.pos.x += dx;
+          } else if (this.isWalkable(this.player.pos.x, this.player.pos.y + dy)) {
+            this.player.pos.y += dy;
+          } else {
+            break;
+          }
         } else {
           break;
         }
@@ -663,13 +149,10 @@ export class DungeonCrawlerScene implements Scene {
       this.player.shootCooldown = SHOOT_COOLDOWN;
     }
 
-    // --- 2. Move player projectiles ---
-    this.movePlayerProjectiles();
+    // --- 2. Move projectiles ---
+    this.moveProjectiles();
 
-    // --- 3. Move enemy projectiles ---
-    this.moveEnemyProjectiles();
-
-    // --- 4. Move enemies ---
+    // --- 3. Move enemies ---
     for (const enemy of enemies) {
       if (enemy.state !== "active") continue;
       if (enemy.type === "chaser") {
@@ -679,7 +162,7 @@ export class DungeonCrawlerScene implements Scene {
       }
     }
 
-    // --- 5. Enemy AI decisions ---
+    // --- 4. Enemy AI decisions ---
     for (const enemy of enemies) {
       if (enemy.state !== "active") continue;
       if (enemy.type === "ranger") {
@@ -689,7 +172,7 @@ export class DungeonCrawlerScene implements Scene {
       }
     }
 
-    // --- 6. Collision: enemy bodies vs player ---
+    // --- 5. Collision: enemy bodies vs player ---
     for (const enemy of enemies) {
       if (enemy.state !== "active") continue;
       if (enemy.pos.x === this.player.pos.x && enemy.pos.y === this.player.pos.y) {
@@ -697,7 +180,7 @@ export class DungeonCrawlerScene implements Scene {
       }
     }
 
-    // --- 6b. Collision: pickups ---
+    // --- 5b. Collision: pickups ---
     for (const pickup of this.room.pickups) {
       if (pickup.collected) continue;
       if (pickup.pos.x === this.player.pos.x && pickup.pos.y === this.player.pos.y) {
@@ -708,13 +191,13 @@ export class DungeonCrawlerScene implements Scene {
       }
     }
 
-    // --- 7. Update effect timers ---
+    // --- 6. Update effect timers ---
     if (this.player.iFrames > 0) {
       this.player.iFrames--;
     }
     this.updateEnemyTimers();
 
-    // --- 8. Transition dissolved enemies to healed, update rainbow power ---
+    // --- 7. Transition dissolved enemies to healed, update rainbow power ---
     for (const e of enemies) {
       if (e.state === "dissolving" && e.stateTimer <= 0) {
         e.state = "healed";
@@ -730,7 +213,7 @@ export class DungeonCrawlerScene implements Scene {
       this.staticDirty = true; // re-render room with healed background
     }
 
-    // --- 9. Check win/lose ---
+    // --- 8. Check win/lose ---
     if (this.player.health <= 0) {
       this.state = "gameOver";
     }
@@ -788,6 +271,12 @@ export class DungeonCrawlerScene implements Scene {
     return cell === "floor" || cell === "door";
   }
 
+  private isEnemyAt(x: number, y: number, exclude: Enemy): boolean {
+    return this.room.enemies.some(
+      (e) => e !== exclude && e.state === "active" && e.pos.x === x && e.pos.y === y
+    );
+  }
+
   // --- Projectile logic ---
 
   private spawnBeam(): void {
@@ -804,14 +293,12 @@ export class DungeonCrawlerScene implements Scene {
     });
   }
 
-  private movePlayerProjectiles(): void {
+  private moveProjectiles(): void {
     const toRemove: number[] = [];
     const enemies = this.room.enemies;
 
     for (let i = 0; i < this.projectiles.length; i++) {
       const proj = this.projectiles[i];
-      if (!proj.isPlayerBeam) continue;
-
       const delta = DELTA[proj.direction];
       let alive = true;
 
@@ -831,63 +318,37 @@ export class DungeonCrawlerScene implements Scene {
         proj.pos.x = nx;
         proj.pos.y = ny;
 
-        const hitEnemy = enemies.find(
-          (e) => e.state === "active" && e.pos.x === nx && e.pos.y === ny
-        );
-        if (hitEnemy) {
-          hitEnemy.health--;
-          const threshold = hitEnemy.type === "boss"
-            ? hitEnemy.maxHealth - this.getBossEffectiveMaxHealth()
-            : 0;
-          if (hitEnemy.health <= threshold) {
-            hitEnemy.state = "calm";
-            hitEnemy.stateTimer = CALM_DURATION;
+        if (proj.isPlayerBeam) {
+          // Calm enemies absorb beams (no state change)
+          const calmBlocker = enemies.find(
+            (e) => e.state === "calm" && e.pos.x === nx && e.pos.y === ny
+          );
+          if (calmBlocker) {
+            alive = false;
+            break;
           }
-          alive = false;
-          break;
-        }
-      }
 
-      if (!alive) {
-        toRemove.push(i);
-      }
-    }
-
-    for (let i = toRemove.length - 1; i >= 0; i--) {
-      this.projectiles.splice(toRemove[i], 1);
-    }
-  }
-
-  private moveEnemyProjectiles(): void {
-    const toRemove: number[] = [];
-
-    for (let i = 0; i < this.projectiles.length; i++) {
-      const proj = this.projectiles[i];
-      if (proj.isPlayerBeam) continue;
-
-      const delta = DELTA[proj.direction];
-      let alive = true;
-
-      for (let step = 0; step < proj.speed; step++) {
-        const nx = proj.pos.x + delta.x;
-        const ny = proj.pos.y + delta.y;
-
-        if (
-          nx < 0 || nx >= GRID_SIZE ||
-          ny < 0 || ny >= GRID_SIZE ||
-          this.room.grid[ny][nx] === "wall"
-        ) {
-          alive = false;
-          break;
-        }
-
-        proj.pos.x = nx;
-        proj.pos.y = ny;
-
-        if (nx === this.player.pos.x && ny === this.player.pos.y) {
-          this.damagePlayer();
-          alive = false;
-          break;
+          const hitEnemy = enemies.find(
+            (e) => e.state === "active" && e.pos.x === nx && e.pos.y === ny
+          );
+          if (hitEnemy) {
+            hitEnemy.health--;
+            const threshold = hitEnemy.type === "boss"
+              ? hitEnemy.maxHealth - this.getBossEffectiveMaxHealth()
+              : 0;
+            if (hitEnemy.health <= threshold) {
+              hitEnemy.state = "calm";
+              hitEnemy.stateTimer = CALM_DURATION;
+            }
+            alive = false;
+            break;
+          }
+        } else {
+          if (nx === this.player.pos.x && ny === this.player.pos.y) {
+            this.damagePlayer();
+            alive = false;
+            break;
+          }
         }
       }
 
@@ -909,7 +370,7 @@ export class DungeonCrawlerScene implements Scene {
     enemy.moveCooldown = CHASER_MOVE_INTERVAL;
 
     const next = this.bfsNextStep(enemy.pos, this.player.pos);
-    if (next) {
+    if (next && !this.isEnemyAt(next.x, next.y, enemy)) {
       enemy.pos.x = next.x;
       enemy.pos.y = next.y;
     }
@@ -923,8 +384,11 @@ export class DungeonCrawlerScene implements Scene {
     const fireDir = this.getRangerFireDirection(enemy.pos);
     if (fireDir) {
       const delta = DELTA[fireDir];
+      const sx = enemy.pos.x + delta.x;
+      const sy = enemy.pos.y + delta.y;
+      if (!this.isWalkable(sx, sy)) return;
       this.projectiles.push({
-        pos: { x: enemy.pos.x + delta.x, y: enemy.pos.y + delta.y },
+        pos: { x: sx, y: sy },
         direction: fireDir,
         speed: RANGER_SHOT_SPEED,
         isPlayerBeam: false,
@@ -941,7 +405,7 @@ export class DungeonCrawlerScene implements Scene {
     enemy.moveCooldown = BOSS_MOVE_INTERVAL;
 
     const next = this.bfsNextStep(enemy.pos, this.player.pos);
-    if (next) {
+    if (next && !this.isEnemyAt(next.x, next.y, enemy)) {
       enemy.pos.x = next.x;
       enemy.pos.y = next.y;
     }
@@ -1001,18 +465,18 @@ export class DungeonCrawlerScene implements Scene {
       const delta = DELTA[dir];
       let x = from.x;
       let y = from.y;
-      let clear = true;
+      let reachedPlayer = true;
 
       while (true) {
         x += delta.x;
         y += delta.y;
 
         if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
-          clear = false;
+          reachedPlayer = false;
           break;
         }
         if (this.room.grid[y][x] === "wall") {
-          clear = false;
+          reachedPlayer = false;
           break;
         }
         if (x === this.player.pos.x && y === this.player.pos.y) {
@@ -1020,7 +484,7 @@ export class DungeonCrawlerScene implements Scene {
         }
       }
 
-      if (clear) {
+      if (reachedPlayer) {
         const dist = Math.abs(from.x - this.player.pos.x) + Math.abs(from.y - this.player.pos.y);
         if (dist < bestDist) {
           bestDist = dist;
@@ -1033,6 +497,8 @@ export class DungeonCrawlerScene implements Scene {
   }
 
   // --- BFS pathfinding ---
+  // NOTE: Runs per-enemy per-tick. On a 20x20 grid this is fast.
+  // If enemy count grows, consider a single reverse-BFS distance map from player.
 
   private bfsNextStep(from: Point, to: Point): Point | null {
     if (from.x === to.x && from.y === to.y) return null;
@@ -1043,6 +509,7 @@ export class DungeonCrawlerScene implements Scene {
     const toIdx = (x: number, y: number) => y * GRID_SIZE + x;
 
     const queue: Point[] = [{ x: from.x, y: from.y }];
+    let head = 0;
     visited[toIdx(from.x, from.y)] = true;
 
     const neighbors: Point[] = [
@@ -1050,8 +517,8 @@ export class DungeonCrawlerScene implements Scene {
       { x: -1, y: 0 }, { x: 1, y: 0 },
     ];
 
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
+    while (head < queue.length) {
+      const cur = queue[head++];
 
       for (const n of neighbors) {
         const nx = cur.x + n.x;
@@ -1060,7 +527,7 @@ export class DungeonCrawlerScene implements Scene {
         if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
         const idx = toIdx(nx, ny);
         if (visited[idx]) continue;
-        if (grid[ny][nx] === "wall") continue;
+        if (grid[ny][nx] !== "floor") continue;
 
         visited[idx] = true;
         parent[idx] = toIdx(cur.x, cur.y);
@@ -1509,7 +976,6 @@ export class DungeonCrawlerScene implements Scene {
     }
 
     if (MOVE_KEY_DIRECTION[key]) {
-      this.player.facing = MOVE_KEY_DIRECTION[key];
       this.player.aimDirection = MOVE_KEY_DIRECTION[key];
     }
     if (AIM_KEY_DIRECTION[key]) {

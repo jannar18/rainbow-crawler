@@ -62,7 +62,6 @@ async function bootstrap() {
   // Ranger (chort) — 0-indexed frames
   for (let i = 0; i <= 3; i++) {
     paths.push(`sprites/ranger/chort_idle_anim_f${i}.png`);
-    paths.push(`sprites/ranger/chort_run_anim_f${i}.png`);
   }
 
   // Ranger healed (mushroom)
@@ -79,24 +78,10 @@ async function bootstrap() {
   // Boss healed (forest guardian)
   for (let i = 1; i <= 4; i++) {
     paths.push(`sprites/boss-healed/forestguardian_idle_${i}.png`);
-    paths.push(`sprites/boss-healed/forestguardian_walk_${i}.png`);
   }
 
   // Tiles
-  paths.push(
-    "sprites/tiles/wall_mid.png",
-    "sprites/tiles/wall_left.png",
-    "sprites/tiles/wall_right.png",
-    "sprites/tiles/wall_top_mid.png",
-    "sprites/tiles/wall_top_left.png",
-    "sprites/tiles/wall_top_right.png",
-    "sprites/tiles/doors_leaf_closed.png",
-    "sprites/tiles/doors_leaf_open.png",
-    "sprites/tiles/column.png"
-  );
-  for (let i = 1; i <= 8; i++) {
-    paths.push(`sprites/tiles/floor_${i}.png`);
-  }
+  paths.push("sprites/tiles/doors_leaf_closed.png");
   for (let i = 1; i <= 10; i++) {
     paths.push(`sprites/tiles/jungle_wall_${i}.png`);
   }
@@ -104,9 +89,7 @@ async function bootstrap() {
   // UI
   paths.push(
     "sprites/ui/ui_heart_full.png",
-    "sprites/ui/ui_heart_half.png",
-    "sprites/ui/ui_heart_empty.png",
-    "sprites/ui/flask_big_red.png"
+    "sprites/ui/ui_heart_empty.png"
   );
 
   // --- Load all ---
@@ -138,7 +121,6 @@ async function bootstrap() {
     },
     ranger: {
       idle: loadFrames(loaded, "sprites/ranger/chort_idle_anim_f", 4, 0),
-      run: loadFrames(loaded, "sprites/ranger/chort_run_anim_f", 4, 0),
     },
     rangerHealed: loadFrames(
       loaded,
@@ -151,17 +133,13 @@ async function bootstrap() {
     },
     bossHealed: {
       idle: loadFrames(loaded, "sprites/boss-healed/forestguardian_idle_", 4),
-      walk: loadFrames(loaded, "sprites/boss-healed/forestguardian_walk_", 4),
     },
     tiles: {
-      wallMid: loaded["sprites/tiles/wall_mid.png"],
       jungleWalls: loadFrames(loaded, "sprites/tiles/jungle_wall_", 10),
-      floors: loadFrames(loaded, "sprites/tiles/floor_", 8),
       doorClosed: loaded["sprites/tiles/doors_leaf_closed.png"],
     },
     ui: {
       heartFull: loaded["sprites/ui/ui_heart_full.png"],
-      heartHalf: loaded["sprites/ui/ui_heart_half.png"],
       heartEmpty: loaded["sprites/ui/ui_heart_empty.png"],
     },
   };

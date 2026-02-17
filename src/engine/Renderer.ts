@@ -100,38 +100,6 @@ export class Renderer implements IRenderer {
     this.staticContainer.addChild(s);
   }
 
-  drawSpriteAlpha(
-    gridX: number,
-    gridY: number,
-    texture: Texture,
-    alpha: number
-  ): void {
-    const s = new Sprite(texture);
-    s.x = gridX * CELL_SIZE;
-    s.y = gridY * CELL_SIZE;
-    s.width = CELL_SIZE;
-    s.height = CELL_SIZE;
-    s.alpha = alpha;
-    this.drawContainer.addChild(s);
-  }
-
-  drawSpriteTinted(
-    gridX: number,
-    gridY: number,
-    texture: Texture,
-    tint: number,
-    alpha: number
-  ): void {
-    const s = new Sprite(texture);
-    s.x = gridX * CELL_SIZE;
-    s.y = gridY * CELL_SIZE;
-    s.width = CELL_SIZE;
-    s.height = CELL_SIZE;
-    s.tint = tint;
-    s.alpha = alpha;
-    this.drawContainer.addChild(s);
-  }
-
   drawSpriteScaled(
     gridX: number,
     gridY: number,
