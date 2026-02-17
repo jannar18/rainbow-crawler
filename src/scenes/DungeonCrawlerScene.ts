@@ -187,7 +187,10 @@ export class DungeonCrawlerScene implements Scene {
       return;
     }
 
-    // --- 1b. Process input: shooting ---
+    // --- 1b. Move projectiles ---
+    this.moveProjectiles();
+
+    // --- 1c. Process input: shooting ---
     if (this.player.shootCooldown > 0) {
       this.player.shootCooldown--;
     }
@@ -196,9 +199,6 @@ export class DungeonCrawlerScene implements Scene {
         this.player.shootCooldown = SHOOT_COOLDOWN;
       }
     }
-
-    // --- 2. Move projectiles ---
-    this.moveProjectiles();
 
     // --- 3. Move enemies ---
     for (const enemy of enemies) {
