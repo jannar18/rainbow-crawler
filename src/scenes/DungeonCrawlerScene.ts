@@ -656,6 +656,16 @@ export class DungeonCrawlerScene implements Scene {
       if (enemy.state === "active") {
         const frame = this.getEnemyActiveTexture(enemy);
         renderer.drawSpriteScaled(enemy.pos.x, enemy.pos.y, frame, sc);
+        // Boss HP bar
+        if (enemy.type === "boss") {
+          const barW = CELL_SIZE * sc;
+          const barH = 4;
+          const barX = enemy.pos.x * CELL_SIZE + (CELL_SIZE - barW) / 2;
+          const barY = enemy.pos.y * CELL_SIZE + (CELL_SIZE - CELL_SIZE * sc) / 2 - barH - 2;
+          const fill = enemy.health / enemy.maxHealth;
+          const colorIdx = Math.floor(this.tickCount / 3) % RAINBOW_COLORS.length;
+          renderer.drawBar(barX, barY, barW, barH, fill, RAINBOW_COLORS[colorIdx], 0x222233);
+        }
       } else if (enemy.state === "calm") {
         // Show healed form at reduced alpha (pulsing)
         const alpha = 0.5 + 0.3 * (enemy.stateTimer / CALM_DURATION);
@@ -681,12 +691,22 @@ export class DungeonCrawlerScene implements Scene {
     // Draw projectiles
     for (const proj of this.projectiles) {
       if (proj.isPlayerBeam) {
-        // Rainbow beam: color cycles based on position
-        const colorIdx = (proj.pos.x + proj.pos.y + this.tickCount) % RAINBOW_COLORS.length;
-        renderer.drawRectAlpha(
-          proj.pos.x + 0.15, proj.pos.y + 0.15, 0.7, 0.7,
-          RAINBOW_COLORS[colorIdx], 0.9
-        );
+        // Rainbow stream: continuous beam from player to projectile head
+        const delta = DELTA[proj.direction];
+        let sx = this.player.pos.x + delta.x;
+        let sy = this.player.pos.y + delta.y;
+        while (true) {
+          if (sx < 0 || sx >= GRID_SIZE || sy < 0 || sy >= GRID_SIZE) break;
+          if (this.room.grid[sy][sx] === "wall") break;
+          const colorIdx = (sx + sy + this.tickCount) % RAINBOW_COLORS.length;
+          renderer.drawRectAlpha(
+            sx + 0.15, sy + 0.15, 0.7, 0.7,
+            RAINBOW_COLORS[colorIdx], 0.9
+          );
+          if (sx === proj.pos.x && sy === proj.pos.y) break;
+          sx += delta.x;
+          sy += delta.y;
+        }
       } else {
         renderer.drawRectAlpha(
           proj.pos.x + 0.2, proj.pos.y + 0.2, 0.6, 0.6,

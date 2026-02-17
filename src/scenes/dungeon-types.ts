@@ -129,9 +129,9 @@ export const OPPOSITE_DIR: Record<Direction, Direction> = {
   right: "left",
 };
 
-// Soft rainbow palette (from art direction brainstorm)
+// Vivid rainbow palette
 export const RAINBOW_COLORS = [
-  0xff6b6b, 0xffa06b, 0xffd93d, 0x6bcf7f, 0x6bb5ff, 0x9b7dff, 0xd97dff,
+  0xff3333, 0xff8833, 0xffdd00, 0x33ee66, 0x33aaff, 0x8855ff, 0xee55ff,
 ];
 
 // Enchanted forest pastel floor palette (warm mossy tones)
