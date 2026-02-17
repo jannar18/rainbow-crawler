@@ -147,34 +147,34 @@ export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
   normal: {
     label: "Normal",
 
+    roomCountMin: 5, roomCountMax: 7,
+    enemiesPerRoomMin: 2, enemiesPerRoomMax: 4,
+    pickupsPerRoom: 1,
+    enemyHealth: 1, chaserMoveInterval: 3,
+    rangerFireInterval: 7, rangerShotSpeed: 1,
+    bossHealth: 4, bossFireInterval: 7, bossMoveInterval: 3, bossShotSpeed: 1,
+    calmDuration: 6,
+  },
+  hard: {
+    label: "Hard",
+
     roomCountMin: 6, roomCountMax: 8,
     enemiesPerRoomMin: 3, enemiesPerRoomMax: 5,
     pickupsPerRoom: 1,
     enemyHealth: 1, chaserMoveInterval: 2,
     rangerFireInterval: 6, rangerShotSpeed: 1,
     bossHealth: 5, bossFireInterval: 6, bossMoveInterval: 3, bossShotSpeed: 1,
-    calmDuration: 6,
-  },
-  hard: {
-    label: "Hard",
-
-    roomCountMin: 7, roomCountMax: 9,
-    enemiesPerRoomMin: 4, enemiesPerRoomMax: 6,
-    pickupsPerRoom: 1,
-    enemyHealth: 2, chaserMoveInterval: 2,
-    rangerFireInterval: 5, rangerShotSpeed: 2,
-    bossHealth: 7, bossFireInterval: 5, bossMoveInterval: 3, bossShotSpeed: 2,
     calmDuration: 5,
   },
   nightmare: {
     label: "Nightmare",
 
-    roomCountMin: 8, roomCountMax: 10,
-    enemiesPerRoomMin: 5, enemiesPerRoomMax: 7,
+    roomCountMin: 7, roomCountMax: 9,
+    enemiesPerRoomMin: 4, enemiesPerRoomMax: 6,
     pickupsPerRoom: 0,
-    enemyHealth: 2, chaserMoveInterval: 1,
-    rangerFireInterval: 4, rangerShotSpeed: 2,
-    bossHealth: 10, bossFireInterval: 4, bossMoveInterval: 2, bossShotSpeed: 2,
+    enemyHealth: 2, chaserMoveInterval: 2,
+    rangerFireInterval: 5, rangerShotSpeed: 2,
+    bossHealth: 7, bossFireInterval: 5, bossMoveInterval: 2, bossShotSpeed: 2,
     calmDuration: 4,
   },
 };

@@ -43,6 +43,13 @@ export interface Renderer {
     gridY: number,
     texture: import("pixi.js").Texture
   ): void;
+  drawSpritePixel(
+    pixelX: number,
+    pixelY: number,
+    texture: import("pixi.js").Texture,
+    size: number,
+    alpha?: number
+  ): void;
   drawSpriteScaled(
     gridX: number,
     gridY: number,

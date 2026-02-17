@@ -100,6 +100,22 @@ export class Renderer implements IRenderer {
     this.staticContainer.addChild(s);
   }
 
+  drawSpritePixel(
+    pixelX: number,
+    pixelY: number,
+    texture: Texture,
+    size: number,
+    alpha = 1
+  ): void {
+    const s = new Sprite(texture);
+    s.x = pixelX;
+    s.y = pixelY;
+    s.width = size;
+    s.height = size;
+    s.alpha = alpha;
+    this.drawContainer.addChild(s);
+  }
+
   drawSpriteScaled(
     gridX: number,
     gridY: number,

@@ -862,44 +862,40 @@ export class DungeonCrawlerScene implements Scene {
     const boss = this.room.enemies.find((e) => e.type === "boss" && e.state === "active");
     if (boss) {
       const cx = CANVAS_WIDTH / 2;
-      const heartsY = CANVAS_HEIGHT - 28;
+      const heartsY = CANVAS_HEIGHT - 32;
       const colorIdx = Math.floor(this.tickCount / 3) % RAINBOW_COLORS.length;
       const effectiveMax = this.getBossEffectiveMaxHealth();
       const threshold = boss.maxHealth - effectiveMax;
       const effectiveHealth = Math.max(0, boss.health - threshold);
 
       // Title
-      renderer.drawText("Corrupted Troll", cx, heartsY - 18, {
+      renderer.drawText("Corrupted Troll", cx, heartsY - 20, {
         fontSize: 13, color: 0xff8866, anchor: 0.5,
       });
 
-      // Draw hearts: full (rainbow) | empty active (gray) | depleted by rainbow (dark purple)
-      const heartSize = 18;
+      // Draw hearts using same sprites as player hearts
+      const heartSize = 20;
       const heartSpacing = heartSize + 2;
       const totalWidth = boss.maxHealth * heartSpacing - 2;
-      const startX = cx - totalWidth / 2;
+      const hStartX = cx - totalWidth / 2;
 
       for (let i = 0; i < boss.maxHealth; i++) {
-        const hx = startX + i * heartSpacing + heartSpacing / 2;
-        let color: number;
-        if (i < effectiveHealth) {
-          // Full heart — rainbow cycling
-          color = RAINBOW_COLORS[(i + Math.floor(this.tickCount / 3)) % RAINBOW_COLORS.length];
-        } else if (i < effectiveMax) {
-          // Damaged but within effective range — dark gray
-          color = 0x444455;
+        const hx = hStartX + i * heartSpacing;
+        if (i >= effectiveMax) {
+          // Depleted by rainbow power — show empty heart, dimmed
+          renderer.drawSpritePixel(hx, heartsY, tex.ui.heartEmpty, heartSize, 0.3);
+        } else if (i < effectiveHealth) {
+          // Full heart — active HP
+          renderer.drawSpritePixel(hx, heartsY, tex.ui.heartFull, heartSize);
         } else {
-          // Depleted by rainbow power — dim purple
-          color = 0x332244;
+          // Damaged — show empty/hollow heart
+          renderer.drawSpritePixel(hx, heartsY, tex.ui.heartEmpty, heartSize);
         }
-        renderer.drawText("♥", hx, heartsY, {
-          fontSize: heartSize, color, anchor: 0.5,
-        });
       }
 
       // Boss weakened popup
       if (this.bossWeakenedPopupTimer > 0) {
-        const popupY = heartsY - 36 - (20 - this.bossWeakenedPopupTimer) * 0.5;
+        const popupY = heartsY - 38 - (20 - this.bossWeakenedPopupTimer) * 0.5;
         renderer.drawText("Rainbow Power weakened the boss!", cx, popupY, {
           fontSize: 12, color: RAINBOW_COLORS[colorIdx], anchor: 0.5,
         });
