@@ -20,6 +20,7 @@ export interface GameTextures {
   bossHealed: { idle: Texture[]; walk: Texture[] };
   tiles: {
     wallMid: Texture;
+    jungleWalls: Texture[];
     floors: Texture[];
     doorClosed: Texture;
   };
@@ -136,6 +137,11 @@ const OPPOSITE_DIR: Record<Direction, Direction> = {
 // Soft rainbow palette (from art direction brainstorm)
 const RAINBOW_COLORS = [
   0xff6b6b, 0xffa06b, 0xffd93d, 0x6bcf7f, 0x6bb5ff, 0x9b7dff, 0xd97dff,
+];
+
+// Enchanted forest pastel floor palette (warm mossy tones)
+const RAINBOW_FLOOR_COLORS = [
+  0xc4ddb2, 0xa8d4a0, 0xd4e8b8, 0xf0e6b0, 0xe8d0a8, 0xf2c8c0, 0xb8d8c4,
 ];
 
 // Environment colors
@@ -719,8 +725,9 @@ export class DungeonCrawlerScene implements Scene {
       }
     }
 
-    if (this.room.enemies.every((e) => e.state === "healed")) {
+    if (!this.room.cleared && this.room.enemies.every((e) => e.state === "healed")) {
       this.room.cleared = true;
+      this.staticDirty = true; // re-render room with healed background
     }
 
     // --- 9. Check win/lose ---
@@ -1133,20 +1140,35 @@ export class DungeonCrawlerScene implements Scene {
 
   private renderRoom(renderer: Renderer): void {
     const tiles = this.textures.tiles;
+    const cleared = this.room.cleared && this.state === "playing";
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
         const cell = this.room.grid[y][x];
         switch (cell) {
-          case "wall":
-            renderer.drawSpriteStatic(x, y, tiles.wallMid);
+          case "wall": {
+            // Deterministic pseudo-random tile pick per cell
+            let h = x * 374761 + y * 668265;
+            h = ((h >> 16) ^ h) * 0x45d9f3b;
+            h = ((h >> 16) ^ h);
+            const wallIdx = ((h >>> 0) % tiles.jungleWalls.length);
+            renderer.drawSpriteStatic(x, y, tiles.jungleWalls[wallIdx]);
             break;
+          }
           case "door":
             renderer.drawSpriteStatic(x, y, tiles.doorClosed);
             break;
           case "floor":
-          default:
-            renderer.drawRectStatic(x, y, 1, 1, 0x33334d);
+          default: {
+            let floorColor = 0x2a1519;
+            if (cleared) {
+              let fh = x * 271828 + y * 314159;
+              fh = ((fh >> 16) ^ fh) * 0x45d9f3b;
+              fh = ((fh >> 16) ^ fh);
+              floorColor = RAINBOW_FLOOR_COLORS[(fh >>> 0) % RAINBOW_FLOOR_COLORS.length];
+            }
+            renderer.drawRectStatic(x, y, 1, 1, floorColor);
             break;
+          }
         }
       }
     }

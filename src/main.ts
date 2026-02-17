@@ -97,6 +97,9 @@ async function bootstrap() {
   for (let i = 1; i <= 8; i++) {
     paths.push(`sprites/tiles/floor_${i}.png`);
   }
+  for (let i = 1; i <= 10; i++) {
+    paths.push(`sprites/tiles/jungle_wall_${i}.png`);
+  }
 
   // UI
   paths.push(
@@ -152,6 +155,7 @@ async function bootstrap() {
     },
     tiles: {
       wallMid: loaded["sprites/tiles/wall_mid.png"],
+      jungleWalls: loadFrames(loaded, "sprites/tiles/jungle_wall_", 10),
       floors: loadFrames(loaded, "sprites/tiles/floor_", 8),
       doorClosed: loaded["sprites/tiles/doors_leaf_closed.png"],
     },
