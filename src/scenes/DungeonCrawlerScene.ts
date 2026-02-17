@@ -7,15 +7,11 @@ import {
   SHOOT_COOLDOWN,
   BEAM_SPEED,
   I_FRAME_DURATION,
-  CHASER_MOVE_INTERVAL,
-  RANGER_FIRE_INTERVAL,
-  RANGER_SHOT_SPEED,
-  CALM_DURATION,
   DISSOLVE_DURATION,
-  BOSS_BASE_HEALTH,
-  BOSS_FIRE_INTERVAL,
-  BOSS_MOVE_INTERVAL,
-  BOSS_SHOT_SPEED,
+  DIFFICULTY_PRESETS,
+  ALL_DIFFICULTIES,
+  ALL_NIGHTMARE_MODIFIERS,
+  NIGHTMARE_MODIFIER_LABELS,
   DELTA,
   OPPOSITE_DIR,
   RAINBOW_COLORS,
@@ -28,11 +24,15 @@ import {
   animFrame,
   doorPos,
   entryPos,
+  rng,
 } from "./dungeon-types.js";
 import type {
   GameTextures,
   Point,
   Direction,
+  Difficulty,
+  DifficultyConfig,
+  NightmareModifier,
   GameState,
   EnemyState,
   PlayerCharacter,
@@ -54,6 +54,9 @@ export class DungeonCrawlerScene implements Scene {
   private state: GameState = "start";
   private player!: Player;
   private playerCharacter: PlayerCharacter = "fairy";
+  private selectedDifficulty: Difficulty = "easy";
+  private difficultyConfig: DifficultyConfig = DIFFICULTY_PRESETS.easy;
+  private activeModifiers: NightmareModifier[] = [];
   private projectiles: Projectile[] = [];
   private dungeon!: Dungeon;
   private heldKeys = new Set<string>();
@@ -61,6 +64,7 @@ export class DungeonCrawlerScene implements Scene {
   private tickCount = 0;
   private rainbowPower = 0;
   private healedEnemies = 0;
+  private bossWeakenedPopupTimer = 0;
 
   constructor(textures: GameTextures) {
     this.textures = textures;
@@ -75,7 +79,18 @@ export class DungeonCrawlerScene implements Scene {
   }
 
   private resetGame(): void {
-    this.dungeon = generateDungeon();
+    // Build effective config from preset + Nightmare modifiers
+    const base = DIFFICULTY_PRESETS[this.selectedDifficulty];
+    this.activeModifiers = [];
+    if (this.selectedDifficulty === "nightmare") {
+      const pool = [...ALL_NIGHTMARE_MODIFIERS];
+      rng.shuffle(pool);
+      const count = rng.nextInt(1, 2);
+      this.activeModifiers = pool.slice(0, count);
+    }
+    this.difficultyConfig = this.applyModifiers(base, this.activeModifiers);
+
+    this.dungeon = generateDungeon(this.difficultyConfig);
     this.player = {
       pos: { ...this.dungeon.rooms[0].playerSpawn },
       aimDirection: "right",
@@ -91,6 +106,33 @@ export class DungeonCrawlerScene implements Scene {
     this.tickCount = 0;
     this.rainbowPower = 0;
     this.healedEnemies = 0;
+    this.bossWeakenedPopupTimer = 0;
+  }
+
+  private applyModifiers(base: DifficultyConfig, mods: NightmareModifier[]): DifficultyConfig {
+    const config = { ...base, modifiers: mods };
+    for (const mod of mods) {
+      switch (mod) {
+        case "noPickups":
+          config.pickupsPerRoom = 0;
+          break;
+        case "doubleBoss":
+          config.bossHealth = base.bossHealth * 2;
+          break;
+        case "swarm":
+          config.enemiesPerRoomMin = base.enemiesPerRoomMin + 2;
+          config.enemiesPerRoomMax = base.enemiesPerRoomMax + 2;
+          break;
+        case "fastShots":
+          config.rangerShotSpeed = base.rangerShotSpeed + 1;
+          config.bossShotSpeed = base.bossShotSpeed + 1;
+          break;
+        case "cursedHealing":
+          config.calmDuration = Math.max(1, Math.floor(base.calmDuration / 2));
+          break;
+      }
+    }
+    return config;
   }
 
   update(_dt: number): void {
@@ -195,6 +237,9 @@ export class DungeonCrawlerScene implements Scene {
     if (this.player.iFrames > 0) {
       this.player.iFrames--;
     }
+    if (this.bossWeakenedPopupTimer > 0) {
+      this.bossWeakenedPopupTimer--;
+    }
     this.updateEnemyTimers();
 
     // --- 7. Transition dissolved enemies to healed, update rainbow power ---
@@ -247,6 +292,11 @@ export class DungeonCrawlerScene implements Scene {
     const enterDir = OPPOSITE_DIR[transitionDir];
     const entry = entryPos(enterDir);
     this.player.pos = { ...entry };
+
+    // Show popup when entering boss room with rainbow power
+    if (targetRoomIdx === this.dungeon.bossRoom && this.rainbowPower > 0) {
+      this.bossWeakenedPopupTimer = 20;
+    }
 
     this.staticDirty = true;
   }
@@ -338,7 +388,7 @@ export class DungeonCrawlerScene implements Scene {
               : 0;
             if (hitEnemy.health <= threshold) {
               hitEnemy.state = "calm";
-              hitEnemy.stateTimer = CALM_DURATION;
+              hitEnemy.stateTimer = this.difficultyConfig.calmDuration;
             }
             alive = false;
             break;
@@ -367,7 +417,7 @@ export class DungeonCrawlerScene implements Scene {
   private updateChaser(enemy: Enemy): void {
     enemy.moveCooldown--;
     if (enemy.moveCooldown > 0) return;
-    enemy.moveCooldown = CHASER_MOVE_INTERVAL;
+    enemy.moveCooldown = this.difficultyConfig.chaserMoveInterval;
 
     const next = this.bfsNextStep(enemy.pos, this.player.pos);
     if (next && !this.isEnemyAt(next.x, next.y, enemy)) {
@@ -379,7 +429,7 @@ export class DungeonCrawlerScene implements Scene {
   private updateRanger(enemy: Enemy): void {
     enemy.shootCooldown--;
     if (enemy.shootCooldown > 0) return;
-    enemy.shootCooldown = RANGER_FIRE_INTERVAL;
+    enemy.shootCooldown = this.difficultyConfig.rangerFireInterval;
 
     const fireDir = this.getRangerFireDirection(enemy.pos);
     if (fireDir) {
@@ -390,7 +440,7 @@ export class DungeonCrawlerScene implements Scene {
       this.projectiles.push({
         pos: { x: sx, y: sy },
         direction: fireDir,
-        speed: RANGER_SHOT_SPEED,
+        speed: this.difficultyConfig.rangerShotSpeed,
         isPlayerBeam: false,
       });
     }
@@ -402,7 +452,7 @@ export class DungeonCrawlerScene implements Scene {
 
     enemy.moveCooldown--;
     if (enemy.moveCooldown > 0) return;
-    enemy.moveCooldown = BOSS_MOVE_INTERVAL;
+    enemy.moveCooldown = this.difficultyConfig.bossMoveInterval;
 
     const next = this.bfsNextStep(enemy.pos, this.player.pos);
     if (next && !this.isEnemyAt(next.x, next.y, enemy)) {
@@ -414,7 +464,7 @@ export class DungeonCrawlerScene implements Scene {
   private updateBossAI(enemy: Enemy): void {
     enemy.shootCooldown--;
     if (enemy.shootCooldown > 0) return;
-    enemy.shootCooldown = BOSS_FIRE_INTERVAL;
+    enemy.shootCooldown = this.difficultyConfig.bossFireInterval;
 
     const dirs: Direction[] = ["up", "down", "left", "right"];
     let bestDir: Direction = "down";
@@ -440,7 +490,7 @@ export class DungeonCrawlerScene implements Scene {
         this.projectiles.push({
           pos: { x: sx, y: sy },
           direction: dir,
-          speed: BOSS_SHOT_SPEED,
+          speed: this.difficultyConfig.bossShotSpeed,
           isPlayerBeam: false,
         });
       }
@@ -574,7 +624,10 @@ export class DungeonCrawlerScene implements Scene {
   // --- Boss health adjusted by rainbow power ---
 
   private getBossEffectiveMaxHealth(): number {
-    return Math.max(2, BOSS_BASE_HEALTH - Math.floor(this.rainbowPower * 3));
+    const bossHP = this.difficultyConfig.bossHealth;
+    // Rainbow power can reduce effective boss HP by up to half (minimum 2)
+    const reduction = Math.floor(this.rainbowPower * Math.floor(bossHP / 2));
+    return Math.max(2, bossHP - reduction);
   }
 
   // --- Rendering ---
@@ -656,19 +709,46 @@ export class DungeonCrawlerScene implements Scene {
       if (enemy.state === "active") {
         const frame = this.getEnemyActiveTexture(enemy);
         renderer.drawSpriteScaled(enemy.pos.x, enemy.pos.y, frame, sc);
-        // Boss HP bar
+        // Boss HP bar with rainbow power visibility
         if (enemy.type === "boss") {
           const barW = CELL_SIZE * sc;
           const barH = 4;
           const barX = enemy.pos.x * CELL_SIZE + (CELL_SIZE - barW) / 2;
           const barY = enemy.pos.y * CELL_SIZE + (CELL_SIZE - CELL_SIZE * sc) / 2 - barH - 2;
-          const fill = enemy.health / enemy.maxHealth;
+          const effectiveMax = this.getBossEffectiveMaxHealth();
           const colorIdx = Math.floor(this.tickCount / 3) % RAINBOW_COLORS.length;
-          renderer.drawBar(barX, barY, barW, barH, fill, RAINBOW_COLORS[colorIdx], 0x222233);
+
+          // Draw full background
+          renderer.drawBar(barX, barY, barW, barH, 0, 0x000000, 0x222233);
+
+          // Draw depleted section (portion removed by rainbow power) in dim purple
+          if (effectiveMax < enemy.maxHealth) {
+            const depletedRatio = 1 - effectiveMax / enemy.maxHealth;
+            const depletedX = barX + barW * (1 - depletedRatio);
+            renderer.drawBar(depletedX, barY, barW * depletedRatio, barH, 1, 0x443355, 0x443355);
+          }
+
+          // Draw effective HP fill
+          const threshold = enemy.maxHealth - effectiveMax;
+          const effectiveHealth = Math.max(0, enemy.health - threshold);
+          const fill = effectiveMax > 0 ? effectiveHealth / effectiveMax : 0;
+          const fillWidth = barW * (effectiveMax / enemy.maxHealth);
+          renderer.drawBar(barX, barY, fillWidth, barH, fill, RAINBOW_COLORS[colorIdx], 0x222233);
+
+          // Boss weakened popup
+          if (this.bossWeakenedPopupTimer > 0) {
+            const popupAlpha = Math.min(1, this.bossWeakenedPopupTimer / 10);
+            const popupY = barY - 14 - (20 - this.bossWeakenedPopupTimer) * 0.5;
+            renderer.drawText("Rainbow Power weakened the boss!", barX + barW / 2, popupY, {
+              fontSize: 10,
+              color: RAINBOW_COLORS[colorIdx],
+              anchor: 0.5,
+            });
+          }
         }
       } else if (enemy.state === "calm") {
         // Show healed form at reduced alpha (pulsing)
-        const alpha = 0.5 + 0.3 * (enemy.stateTimer / CALM_DURATION);
+        const alpha = 0.5 + 0.3 * (enemy.stateTimer / this.difficultyConfig.calmDuration);
         const frame = this.getEnemyHealedTexture(enemy);
         renderer.drawSpriteScaled(enemy.pos.x, enemy.pos.y, frame, sc, alpha);
       } else if (enemy.state === "dissolving") {
@@ -733,7 +813,7 @@ export class DungeonCrawlerScene implements Scene {
       const variant = tex.chaser[enemy.gnollVariant];
       if (!variant) return tex.chaser.gnollbrute.idle[frame4];
       // Use walk frames when chaser is moving (cooldown was just reset)
-      const isMoving = enemy.moveCooldown === CHASER_MOVE_INTERVAL;
+      const isMoving = enemy.moveCooldown === this.difficultyConfig.chaserMoveInterval;
       return isMoving ? variant.walk[frame4] : variant.idle[frame4];
     }
 
@@ -744,7 +824,7 @@ export class DungeonCrawlerScene implements Scene {
     // Boss (golem — 6 frames)
     const frame6 = animFrame(this.tickCount, 6, 3);
     const healthRatio = enemy.health / enemy.maxHealth;
-    const isMoving = healthRatio < 0.5 && enemy.moveCooldown === BOSS_MOVE_INTERVAL;
+    const isMoving = healthRatio < 0.5 && enemy.moveCooldown === this.difficultyConfig.bossMoveInterval;
     return isMoving ? tex.boss.walk[frame6] : tex.boss.idle[frame6];
   }
 
@@ -885,13 +965,61 @@ export class DungeonCrawlerScene implements Scene {
       color: 0xffd93d,
     });
 
+    // Difficulty selector
+    const diffY = 370;
+    renderer.drawText("Difficulty:", cx, diffY, {
+      fontSize: 16,
+      color: COLOR_UI_TEXT,
+      anchor: 0.5,
+    });
+
+    const diffLabelY = diffY + 24;
+    const diffIdx = ALL_DIFFICULTIES.indexOf(this.selectedDifficulty);
+    const diffColors: Record<Difficulty, number> = {
+      easy: 0x33ee66,
+      normal: 0xffdd00,
+      hard: 0xff8833,
+      nightmare: 0xff3333,
+    };
+    const preset = DIFFICULTY_PRESETS[this.selectedDifficulty];
+    const arrowColor = 0xffd93d;
+
+    // Left/right arrows
+    if (diffIdx > 0) {
+      renderer.drawText("<", cx - 80, diffLabelY, {
+        fontSize: 16, color: arrowColor, anchor: 0.5,
+      });
+    }
+    renderer.drawText(preset.label, cx, diffLabelY, {
+      fontSize: 18,
+      color: diffColors[this.selectedDifficulty],
+      anchor: 0.5,
+    });
+    if (diffIdx < ALL_DIFFICULTIES.length - 1) {
+      renderer.drawText(">", cx + 80, diffLabelY, {
+        fontSize: 16, color: arrowColor, anchor: 0.5,
+      });
+    }
+
+    // Show nightmare modifier preview
+    if (this.selectedDifficulty === "nightmare") {
+      renderer.drawText("Random modifiers each run!", cx, diffLabelY + 22, {
+        fontSize: 11, color: 0xff6666, anchor: 0.5,
+      });
+    }
+
     // Controls
-    renderer.drawText("< / > to choose  |  SPACE to start", cx, 400, {
-      fontSize: 14,
+    renderer.drawText("< / > choose hero & difficulty  |  SPACE to start", cx, 460, {
+      fontSize: 13,
       color: COLOR_UI_DIM,
       anchor: 0.5,
     });
-    renderer.drawText("WASD: Move  |  Arrows: Aim  |  SPACE: Shoot  |  SHIFT: Sprint", cx, 428, {
+    renderer.drawText("Up / Down to change difficulty", cx, 480, {
+      fontSize: 11,
+      color: COLOR_UI_DIM,
+      anchor: 0.5,
+    });
+    renderer.drawText("WASD: Move  |  Arrows: Aim  |  SPACE: Shoot  |  SHIFT: Sprint", cx, 500, {
       fontSize: 11,
       color: COLOR_UI_DIM,
       anchor: 0.5,
@@ -925,7 +1053,21 @@ export class DungeonCrawlerScene implements Scene {
       anchor: 0.5,
     });
 
-    renderer.drawText("Press SPACE to return", cx, 400, {
+    renderer.drawText(`Difficulty: ${this.difficultyConfig.label}`, cx, 358, {
+      fontSize: 14,
+      color: COLOR_UI_DIM,
+      anchor: 0.5,
+    });
+    if (this.activeModifiers.length > 0) {
+      const modNames = this.activeModifiers.map((m) => NIGHTMARE_MODIFIER_LABELS[m]).join(", ");
+      renderer.drawText(modNames, cx, 376, {
+        fontSize: 11,
+        color: 0xff6666,
+        anchor: 0.5,
+      });
+    }
+
+    renderer.drawText("Press SPACE to return", cx, 420, {
       fontSize: 22,
       color: COLOR_UI_TEXT,
       anchor: 0.5,
@@ -967,7 +1109,21 @@ export class DungeonCrawlerScene implements Scene {
       anchor: 0.5,
     });
 
-    renderer.drawText("Press SPACE to return", cx, 410, {
+    renderer.drawText(`Difficulty: ${this.difficultyConfig.label}`, cx, 368, {
+      fontSize: 14,
+      color: COLOR_UI_DIM,
+      anchor: 0.5,
+    });
+    if (this.activeModifiers.length > 0) {
+      const modNames = this.activeModifiers.map((m) => NIGHTMARE_MODIFIER_LABELS[m]).join(", ");
+      renderer.drawText(modNames, cx, 386, {
+        fontSize: 11,
+        color: 0xff6666,
+        anchor: 0.5,
+      });
+    }
+
+    renderer.drawText("Press SPACE to return", cx, 420, {
       fontSize: 22,
       color: COLOR_UI_TEXT,
       anchor: 0.5,
@@ -978,7 +1134,7 @@ export class DungeonCrawlerScene implements Scene {
     this.heldKeys.add(key);
 
     if (this.state === "start") {
-      // Character selection with arrow keys
+      // Character selection with left/right
       if (key === "ArrowLeft" || key === "KeyA") {
         this.playerCharacter = "fairy";
         return;
@@ -987,8 +1143,20 @@ export class DungeonCrawlerScene implements Scene {
         this.playerCharacter = "wizard";
         return;
       }
+      // Difficulty selection with up/down
+      if (key === "ArrowUp" || key === "KeyW") {
+        const idx = ALL_DIFFICULTIES.indexOf(this.selectedDifficulty);
+        if (idx > 0) this.selectedDifficulty = ALL_DIFFICULTIES[idx - 1];
+        return;
+      }
+      if (key === "ArrowDown" || key === "KeyS") {
+        const idx = ALL_DIFFICULTIES.indexOf(this.selectedDifficulty);
+        if (idx < ALL_DIFFICULTIES.length - 1) this.selectedDifficulty = ALL_DIFFICULTIES[idx + 1];
+        return;
+      }
       if (key === "Space") {
         this.state = "playing";
+        this.resetGame();
         this.heldKeys.delete("Space");
         return;
       }

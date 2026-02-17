@@ -4,8 +4,6 @@ import {
   doorPos,
   DELTA,
   OPPOSITE_DIR,
-  BOSS_BASE_HEALTH,
-  ENEMY_HEALTH,
   GNOLL_VARIANTS,
   ELF_GENDERS,
 } from "./dungeon-types.js";
@@ -13,6 +11,7 @@ import type {
   Point,
   Direction,
   CellType,
+  DifficultyConfig,
   EnemyType,
   Room,
   Dungeon,
@@ -20,8 +19,8 @@ import type {
 
 // --- Dungeon generation ---
 
-export function generateDungeon(): Dungeon {
-  const numRooms = rng.nextInt(5, 7);
+export function generateDungeon(config: DifficultyConfig): Dungeon {
+  const numRooms = rng.nextInt(config.roomCountMin, config.roomCountMax);
   const dirs: Direction[] = ["up", "down", "left", "right"];
 
   interface RoomNode {
@@ -67,8 +66,8 @@ export function generateDungeon(): Dungeon {
         pos: { ...bossPos },
         type: "boss",
         state: "active",
-        health: BOSS_BASE_HEALTH,
-        maxHealth: BOSS_BASE_HEALTH,
+        health: config.bossHealth,
+        maxHealth: config.bossHealth,
         stateTimer: 0,
         moveCooldown: 1,
         shootCooldown: 1,
@@ -77,7 +76,7 @@ export function generateDungeon(): Dungeon {
       });
       totalEnemies++;
     } else {
-      const enemyCount = rng.nextInt(2, 4);
+      const enemyCount = rng.nextInt(config.enemiesPerRoomMin, config.enemiesPerRoomMax);
       for (let e = 0; e < enemyCount; e++) {
         const pos = pickSpawnPos(floorCells, room);
         if (!pos) break;
@@ -86,8 +85,8 @@ export function generateDungeon(): Dungeon {
           pos,
           type,
           state: "active",
-          health: ENEMY_HEALTH,
-          maxHealth: ENEMY_HEALTH,
+          health: config.enemyHealth,
+          maxHealth: config.enemyHealth,
           stateTimer: 0,
           moveCooldown: type === "chaser" ? 1 : 0,
           shootCooldown: type === "ranger" ? 1 : 0,
@@ -96,7 +95,7 @@ export function generateDungeon(): Dungeon {
         });
         totalEnemies++;
       }
-      placePickups(room, floorCells, rng.nextInt(1, 2));
+      placePickups(room, floorCells, config.pickupsPerRoom);
     }
 
     room.playerSpawn = findPlayerSpawn(room);

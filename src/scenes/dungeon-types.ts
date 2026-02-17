@@ -96,6 +96,92 @@ export interface Dungeon {
   totalEnemies: number;
 }
 
+// --- Difficulty system ---
+
+export type Difficulty = "easy" | "normal" | "hard" | "nightmare";
+export type NightmareModifier = "noPickups" | "doubleBoss" | "swarm" | "fastShots" | "cursedHealing";
+
+export interface DifficultyConfig {
+  label: string;
+  difficulty: Difficulty;
+  roomCountMin: number;
+  roomCountMax: number;
+  enemiesPerRoomMin: number;
+  enemiesPerRoomMax: number;
+  pickupsPerRoom: number;
+  enemyHealth: number;
+  chaserMoveInterval: number;
+  rangerFireInterval: number;
+  rangerShotSpeed: number;
+  bossHealth: number;
+  bossFireInterval: number;
+  bossMoveInterval: number;
+  bossShotSpeed: number;
+  calmDuration: number;
+  modifiers?: NightmareModifier[];
+}
+
+export const ALL_NIGHTMARE_MODIFIERS: NightmareModifier[] = [
+  "noPickups", "doubleBoss", "swarm", "fastShots", "cursedHealing",
+];
+
+export const NIGHTMARE_MODIFIER_LABELS: Record<NightmareModifier, string> = {
+  noPickups: "No Pickups",
+  doubleBoss: "Double Boss HP",
+  swarm: "Swarm",
+  fastShots: "Fast Shots",
+  cursedHealing: "Cursed Healing",
+};
+
+export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
+  easy: {
+    label: "Easy",
+    difficulty: "easy",
+    roomCountMin: 5, roomCountMax: 7,
+    enemiesPerRoomMin: 2, enemiesPerRoomMax: 4,
+    pickupsPerRoom: 2,
+    enemyHealth: 1, chaserMoveInterval: 3,
+    rangerFireInterval: 7, rangerShotSpeed: 1,
+    bossHealth: 3, bossFireInterval: 7, bossMoveInterval: 4, bossShotSpeed: 1,
+    calmDuration: 6,
+  },
+  normal: {
+    label: "Normal",
+    difficulty: "normal",
+    roomCountMin: 6, roomCountMax: 8,
+    enemiesPerRoomMin: 3, enemiesPerRoomMax: 5,
+    pickupsPerRoom: 1,
+    enemyHealth: 1, chaserMoveInterval: 2,
+    rangerFireInterval: 6, rangerShotSpeed: 1,
+    bossHealth: 5, bossFireInterval: 6, bossMoveInterval: 3, bossShotSpeed: 1,
+    calmDuration: 6,
+  },
+  hard: {
+    label: "Hard",
+    difficulty: "hard",
+    roomCountMin: 7, roomCountMax: 9,
+    enemiesPerRoomMin: 4, enemiesPerRoomMax: 6,
+    pickupsPerRoom: 1,
+    enemyHealth: 2, chaserMoveInterval: 2,
+    rangerFireInterval: 5, rangerShotSpeed: 2,
+    bossHealth: 7, bossFireInterval: 5, bossMoveInterval: 3, bossShotSpeed: 2,
+    calmDuration: 5,
+  },
+  nightmare: {
+    label: "Nightmare",
+    difficulty: "nightmare",
+    roomCountMin: 8, roomCountMax: 10,
+    enemiesPerRoomMin: 5, enemiesPerRoomMax: 7,
+    pickupsPerRoom: 0,
+    enemyHealth: 2, chaserMoveInterval: 1,
+    rangerFireInterval: 4, rangerShotSpeed: 2,
+    bossHealth: 10, bossFireInterval: 4, bossMoveInterval: 2, bossShotSpeed: 2,
+    calmDuration: 4,
+  },
+};
+
+export const ALL_DIFFICULTIES: Difficulty[] = ["easy", "normal", "hard", "nightmare"];
+
 // --- Constants ---
 
 export const PLAYER_MAX_HEALTH = 5;
@@ -103,17 +189,7 @@ export const SHOOT_COOLDOWN = 3;
 export const BEAM_SPEED = 2;
 export const I_FRAME_DURATION = 4;
 
-export const ENEMY_HEALTH = 1;
-export const CHASER_MOVE_INTERVAL = 3;
-export const RANGER_FIRE_INTERVAL = 7;
-export const RANGER_SHOT_SPEED = 1;
-export const CALM_DURATION = 6;
 export const DISSOLVE_DURATION = 4;
-
-export const BOSS_BASE_HEALTH = 3;
-export const BOSS_FIRE_INTERVAL = 7;
-export const BOSS_MOVE_INTERVAL = 4;
-export const BOSS_SHOT_SPEED = 1;
 
 export const DELTA: Record<Direction, Point> = {
   up: { x: 0, y: -1 },
