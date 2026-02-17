@@ -1,6 +1,6 @@
 import type { Texture } from "pixi.js";
 import type { Scene, GameContext, Renderer } from "../engine/types.js";
-import { CANVAS_WIDTH, CELL_SIZE, GRID_SIZE } from "../engine/types.js";
+import { CANVAS_WIDTH, CANVAS_HEIGHT, CELL_SIZE, GRID_SIZE } from "../engine/types.js";
 import { generateDungeon } from "./dungeon-gen.js";
 import {
   PLAYER_MAX_HEALTH,
@@ -13,6 +13,7 @@ import {
   ALL_NIGHTMARE_MODIFIERS,
   NIGHTMARE_MODIFIER_LABELS,
   DELTA,
+  DIRECTIONS,
   OPPOSITE_DIR,
   RAINBOW_COLORS,
   RAINBOW_FLOOR_COLORS,
@@ -34,7 +35,6 @@ import type {
   DifficultyConfig,
   NightmareModifier,
   GameState,
-  EnemyState,
   PlayerCharacter,
   Player,
   Enemy,
@@ -46,6 +46,10 @@ import type {
 export type { GameTextures } from "./dungeon-types.js";
 
 const COLOR_ENEMY_SHOT = 0x884422;
+
+function inBounds(x: number, y: number): boolean {
+  return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE;
+}
 
 // --- Scene ---
 
@@ -317,7 +321,7 @@ export class DungeonCrawlerScene implements Scene {
   }
 
   private isWalkable(x: number, y: number): boolean {
-    if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) return false;
+    if (!inBounds(x, y)) return false;
     const cell = this.room.grid[y][x];
     return cell === "floor" || cell === "door";
   }
@@ -357,11 +361,7 @@ export class DungeonCrawlerScene implements Scene {
         const nx = proj.pos.x + delta.x;
         const ny = proj.pos.y + delta.y;
 
-        if (
-          nx < 0 || nx >= GRID_SIZE ||
-          ny < 0 || ny >= GRID_SIZE ||
-          this.room.grid[ny][nx] === "wall"
-        ) {
+        if (!inBounds(nx, ny) || this.room.grid[ny][nx] === "wall") {
           alive = false;
           break;
         }
@@ -467,11 +467,10 @@ export class DungeonCrawlerScene implements Scene {
     if (enemy.shootCooldown > 0) return;
     enemy.shootCooldown = this.difficultyConfig.bossFireInterval;
 
-    const dirs: Direction[] = ["up", "down", "left", "right"];
     let bestDir: Direction = "down";
     let bestAlignment = 0;
 
-    for (const dir of dirs) {
+    for (const dir of DIRECTIONS) {
       const d = DELTA[dir];
       const ddx = this.player.pos.x - enemy.pos.x;
       const ddy = this.player.pos.y - enemy.pos.y;
@@ -487,7 +486,7 @@ export class DungeonCrawlerScene implements Scene {
       const d = DELTA[dir];
       const sx = enemy.pos.x + d.x;
       const sy = enemy.pos.y + d.y;
-      if (sx >= 0 && sx < GRID_SIZE && sy >= 0 && sy < GRID_SIZE && this.room.grid[sy][sx] !== "wall") {
+      if (inBounds(sx, sy) && this.room.grid[sy][sx] !== "wall") {
         this.projectiles.push({
           pos: { x: sx, y: sy },
           direction: dir,
@@ -508,11 +507,10 @@ export class DungeonCrawlerScene implements Scene {
   }
 
   private getRangerFireDirection(from: Point): Direction | null {
-    const dirs: Direction[] = ["up", "down", "left", "right"];
     let bestDir: Direction | null = null;
     let bestDist = Infinity;
 
-    for (const dir of dirs) {
+    for (const dir of DIRECTIONS) {
       const delta = DELTA[dir];
       let x = from.x;
       let y = from.y;
@@ -522,7 +520,7 @@ export class DungeonCrawlerScene implements Scene {
         x += delta.x;
         y += delta.y;
 
-        if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
+        if (!inBounds(x, y)) {
           reachedPlayer = false;
           break;
         }
@@ -575,7 +573,7 @@ export class DungeonCrawlerScene implements Scene {
         const nx = cur.x + n.x;
         const ny = cur.y + n.y;
 
-        if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
+        if (!inBounds(nx, ny)) continue;
         const idx = toIdx(nx, ny);
         if (visited[idx]) continue;
         if (grid[ny][nx] !== "floor") continue;
@@ -740,8 +738,8 @@ export class DungeonCrawlerScene implements Scene {
         const delta = DELTA[proj.direction];
         let sx = this.player.pos.x + delta.x;
         let sy = this.player.pos.y + delta.y;
-        while (true) {
-          if (sx < 0 || sx >= GRID_SIZE || sy < 0 || sy >= GRID_SIZE) break;
+        for (let step = 0; step < GRID_SIZE * 2; step++) {
+          if (!inBounds(sx, sy)) break;
           if (this.room.grid[sy][sx] === "wall") break;
           const colorIdx = (sx + sy + this.tickCount) % RAINBOW_COLORS.length;
           renderer.drawRectAlpha(
@@ -798,9 +796,8 @@ export class DungeonCrawlerScene implements Scene {
     const frame4 = animFrame(this.tickCount, 4, 6); // slower animation for healed
 
     if (enemy.type === "chaser") {
-      const gender = enemy.healedGender as "elf_f" | "elf_m";
-      const elfFrames = tex.chaserHealed[gender];
-      return elfFrames ? elfFrames[frame4] : tex.chaserHealed.elf_f[frame4];
+      const gender = enemy.healedGender === "elf_m" ? "elf_m" : "elf_f";
+      return tex.chaserHealed[gender][frame4];
     }
 
     if (enemy.type === "ranger") {
@@ -861,43 +858,48 @@ export class DungeonCrawlerScene implements Scene {
       );
     }
 
-    // Boss HP bar (top-center, only in boss room with active boss)
+    // Boss HP hearts (bottom-center, only in boss room with active boss)
     const boss = this.room.enemies.find((e) => e.type === "boss" && e.state === "active");
     if (boss) {
       const cx = CANVAS_WIDTH / 2;
-      const barW = CANVAS_WIDTH * 0.55;
-      const barH = 10;
-      const barX = cx - barW / 2;
-      const barY = CANVAS_WIDTH - 28;
+      const heartsY = CANVAS_HEIGHT - 28;
       const colorIdx = Math.floor(this.tickCount / 3) % RAINBOW_COLORS.length;
       const effectiveMax = this.getBossEffectiveMaxHealth();
+      const threshold = boss.maxHealth - effectiveMax;
+      const effectiveHealth = Math.max(0, boss.health - threshold);
 
       // Title
-      const bossLabel = "Corrupted Troll";
-      renderer.drawText(bossLabel, cx, barY - 14, {
+      renderer.drawText("Corrupted Troll", cx, heartsY - 18, {
         fontSize: 13, color: 0xff8866, anchor: 0.5,
       });
 
-      // Full background
-      renderer.drawBar(barX, barY, barW, barH, 0, 0x000000, 0x222233);
+      // Draw hearts: full (rainbow) | empty active (gray) | depleted by rainbow (dark purple)
+      const heartSize = 18;
+      const heartSpacing = heartSize + 2;
+      const totalWidth = boss.maxHealth * heartSpacing - 2;
+      const startX = cx - totalWidth / 2;
 
-      // Depleted section (rainbow power reduction) in dim purple
-      if (effectiveMax < boss.maxHealth) {
-        const depletedRatio = 1 - effectiveMax / boss.maxHealth;
-        const depletedX = barX + barW * (1 - depletedRatio);
-        renderer.drawBar(depletedX, barY, barW * depletedRatio, barH, 1, 0x443355, 0x443355);
+      for (let i = 0; i < boss.maxHealth; i++) {
+        const hx = startX + i * heartSpacing + heartSpacing / 2;
+        let color: number;
+        if (i < effectiveHealth) {
+          // Full heart — rainbow cycling
+          color = RAINBOW_COLORS[(i + Math.floor(this.tickCount / 3)) % RAINBOW_COLORS.length];
+        } else if (i < effectiveMax) {
+          // Damaged but within effective range — dark gray
+          color = 0x444455;
+        } else {
+          // Depleted by rainbow power — dim purple
+          color = 0x332244;
+        }
+        renderer.drawText("♥", hx, heartsY, {
+          fontSize: heartSize, color, anchor: 0.5,
+        });
       }
-
-      // Effective HP fill
-      const threshold = boss.maxHealth - effectiveMax;
-      const effectiveHealth = Math.max(0, boss.health - threshold);
-      const fill = effectiveMax > 0 ? effectiveHealth / effectiveMax : 0;
-      const fillWidth = barW * (effectiveMax / boss.maxHealth);
-      renderer.drawBar(barX, barY, fillWidth, barH, fill, RAINBOW_COLORS[colorIdx], 0x222233);
 
       // Boss weakened popup
       if (this.bossWeakenedPopupTimer > 0) {
-        const popupY = barY - 32 - (20 - this.bossWeakenedPopupTimer) * 0.5;
+        const popupY = heartsY - 36 - (20 - this.bossWeakenedPopupTimer) * 0.5;
         renderer.drawText("Rainbow Power weakened the boss!", cx, popupY, {
           fontSize: 12, color: RAINBOW_COLORS[colorIdx], anchor: 0.5,
         });
@@ -1033,6 +1035,45 @@ export class DungeonCrawlerScene implements Scene {
     });
   }
 
+  private renderEndStats(renderer: Renderer, cx: number, label: string, statsColor: number, startY: number): void {
+    const clearedCount = this.dungeon.rooms.filter((r) => r.cleared).length;
+    renderer.drawText(`Rooms ${label}: ${clearedCount}/${this.dungeon.rooms.length}`, cx, startY, {
+      fontSize: 16,
+      color: statsColor,
+      anchor: 0.5,
+    });
+    renderer.drawText(`Enemies healed: ${this.healedEnemies}/${this.dungeon.totalEnemies}`, cx, startY + 25, {
+      fontSize: 16,
+      color: statsColor,
+      anchor: 0.5,
+    });
+    renderer.drawText(`Rainbow power: ${Math.floor(this.rainbowPower * 100)}%`, cx, startY + 50, {
+      fontSize: 16,
+      color: 0x9b7dff,
+      anchor: 0.5,
+    });
+
+    renderer.drawText(`Difficulty: ${this.difficultyConfig.label}`, cx, startY + 78, {
+      fontSize: 14,
+      color: COLOR_UI_DIM,
+      anchor: 0.5,
+    });
+    if (this.activeModifiers.length > 0) {
+      const modNames = this.activeModifiers.map((m) => NIGHTMARE_MODIFIER_LABELS[m]).join(", ");
+      renderer.drawText(modNames, cx, startY + 96, {
+        fontSize: 11,
+        color: 0xff6666,
+        anchor: 0.5,
+      });
+    }
+
+    renderer.drawText("Press SPACE to return", cx, startY + 140, {
+      fontSize: 22,
+      color: COLOR_UI_TEXT,
+      anchor: 0.5,
+    });
+  }
+
   private renderGameOverScreen(renderer: Renderer): void {
     renderer.drawRectAlpha(0, 0, GRID_SIZE, GRID_SIZE, 0x000000, 0.75);
     const cx = CANVAS_WIDTH / 2;
@@ -1043,98 +1084,26 @@ export class DungeonCrawlerScene implements Scene {
       anchor: 0.5,
     });
 
-    const clearedCount = this.dungeon.rooms.filter((r) => r.cleared).length;
-    renderer.drawText(`Rooms explored: ${clearedCount}/${this.dungeon.rooms.length}`, cx, 280, {
-      fontSize: 16,
-      color: COLOR_UI_DIM,
-      anchor: 0.5,
-    });
-    renderer.drawText(`Enemies healed: ${this.healedEnemies}/${this.dungeon.totalEnemies}`, cx, 305, {
-      fontSize: 16,
-      color: COLOR_UI_DIM,
-      anchor: 0.5,
-    });
-    renderer.drawText(`Rainbow power: ${Math.floor(this.rainbowPower * 100)}%`, cx, 330, {
-      fontSize: 16,
-      color: 0x9b7dff,
-      anchor: 0.5,
-    });
-
-    renderer.drawText(`Difficulty: ${this.difficultyConfig.label}`, cx, 358, {
-      fontSize: 14,
-      color: COLOR_UI_DIM,
-      anchor: 0.5,
-    });
-    if (this.activeModifiers.length > 0) {
-      const modNames = this.activeModifiers.map((m) => NIGHTMARE_MODIFIER_LABELS[m]).join(", ");
-      renderer.drawText(modNames, cx, 376, {
-        fontSize: 11,
-        color: 0xff6666,
-        anchor: 0.5,
-      });
-    }
-
-    renderer.drawText("Press SPACE to return", cx, 420, {
-      fontSize: 22,
-      color: COLOR_UI_TEXT,
-      anchor: 0.5,
-    });
+    this.renderEndStats(renderer, cx, "explored", COLOR_UI_DIM, 280);
   }
 
   private renderWinScreen(renderer: Renderer): void {
     renderer.drawRectAlpha(0, 0, GRID_SIZE, GRID_SIZE, 0x000000, 0.75);
     const cx = CANVAS_WIDTH / 2;
 
-    // Rainbow-ish title
     renderer.drawText("Darkness Healed!", cx, 180, {
       fontSize: 44,
       color: RAINBOW_COLORS[Math.floor(this.tickCount / 4) % RAINBOW_COLORS.length],
       anchor: 0.5,
     });
 
-    // Show healed forest guardian
     const guardianFrame = animFrame(this.tickCount, 4, 4);
     renderer.drawSpriteScaled(
       cx / CELL_SIZE - 0.5, 230 / CELL_SIZE,
       this.textures.bossHealed.idle[guardianFrame], 2.0
     );
 
-    const clearedCount = this.dungeon.rooms.filter((r) => r.cleared).length;
-    renderer.drawText(`Rooms cleared: ${clearedCount}/${this.dungeon.rooms.length}`, cx, 290, {
-      fontSize: 16,
-      color: COLOR_UI_TEXT,
-      anchor: 0.5,
-    });
-    renderer.drawText(`Enemies healed: ${this.healedEnemies}/${this.dungeon.totalEnemies}`, cx, 315, {
-      fontSize: 16,
-      color: COLOR_UI_TEXT,
-      anchor: 0.5,
-    });
-    renderer.drawText(`Rainbow power: ${Math.floor(this.rainbowPower * 100)}%`, cx, 340, {
-      fontSize: 16,
-      color: 0x9b7dff,
-      anchor: 0.5,
-    });
-
-    renderer.drawText(`Difficulty: ${this.difficultyConfig.label}`, cx, 368, {
-      fontSize: 14,
-      color: COLOR_UI_DIM,
-      anchor: 0.5,
-    });
-    if (this.activeModifiers.length > 0) {
-      const modNames = this.activeModifiers.map((m) => NIGHTMARE_MODIFIER_LABELS[m]).join(", ");
-      renderer.drawText(modNames, cx, 386, {
-        fontSize: 11,
-        color: 0xff6666,
-        anchor: 0.5,
-      });
-    }
-
-    renderer.drawText("Press SPACE to return", cx, 420, {
-      fontSize: 22,
-      color: COLOR_UI_TEXT,
-      anchor: 0.5,
-    });
+    this.renderEndStats(renderer, cx, "cleared", COLOR_UI_TEXT, 290);
   }
 
   onKeyDown(key: string): void {
@@ -1178,20 +1147,21 @@ export class DungeonCrawlerScene implements Scene {
       return;
     }
 
-    if (MOVE_KEY_DIRECTION[key]) {
-      this.player.aimDirection = MOVE_KEY_DIRECTION[key];
-    }
-    if (AIM_KEY_DIRECTION[key]) {
-      this.player.aimDirection = AIM_KEY_DIRECTION[key];
-    }
-
-    if (key === "Space") {
-      if (this.state === "gameOver" || this.state === "win") {
+    if (this.state === "gameOver" || this.state === "win") {
+      if (key === "Space") {
         this.resetGame();
         this.state = "start";
         this.staticDirty = true;
         this.heldKeys.delete("Space");
       }
+      return;
+    }
+
+    if (MOVE_KEY_DIRECTION[key]) {
+      this.player.aimDirection = MOVE_KEY_DIRECTION[key];
+    }
+    if (AIM_KEY_DIRECTION[key]) {
+      this.player.aimDirection = AIM_KEY_DIRECTION[key];
     }
   }
 
