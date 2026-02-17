@@ -192,8 +192,9 @@ export class DungeonCrawlerScene implements Scene {
       this.player.shootCooldown--;
     }
     if (this.heldKeys.has("Space") && this.player.shootCooldown <= 0) {
-      this.spawnBeam();
-      this.player.shootCooldown = SHOOT_COOLDOWN;
+      if (this.spawnBeam()) {
+        this.player.shootCooldown = SHOOT_COOLDOWN;
+      }
     }
 
     // --- 2. Move projectiles ---
@@ -334,11 +335,11 @@ export class DungeonCrawlerScene implements Scene {
 
   // --- Projectile logic ---
 
-  private spawnBeam(): void {
+  private spawnBeam(): boolean {
     const delta = DELTA[this.player.aimDirection];
     const startX = this.player.pos.x + delta.x;
     const startY = this.player.pos.y + delta.y;
-    if (!this.isWalkable(startX, startY)) return;
+    if (!this.isWalkable(startX, startY)) return false;
 
     this.projectiles.push({
       pos: { x: startX, y: startY },
@@ -346,6 +347,7 @@ export class DungeonCrawlerScene implements Scene {
       speed: BEAM_SPEED,
       isPlayerBeam: true,
     });
+    return true;
   }
 
   private moveProjectiles(): void {
@@ -1158,9 +1160,6 @@ export class DungeonCrawlerScene implements Scene {
       return;
     }
 
-    if (MOVE_KEY_DIRECTION[key]) {
-      this.player.aimDirection = MOVE_KEY_DIRECTION[key];
-    }
     if (AIM_KEY_DIRECTION[key]) {
       this.player.aimDirection = AIM_KEY_DIRECTION[key];
     }
