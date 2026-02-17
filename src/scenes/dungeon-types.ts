@@ -116,6 +116,8 @@ export interface DifficultyConfig {
   bossFireInterval: number;
   bossMoveInterval: number;
   bossShotSpeed: number;
+  bossPauseCycle: number;
+  bossPauseDuration: number;
   calmDuration: number;
   modifiers?: NightmareModifier[];
 }
@@ -136,13 +138,14 @@ export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
   easy: {
     label: "Easy",
 
-    roomCountMin: 5, roomCountMax: 7,
-    enemiesPerRoomMin: 2, enemiesPerRoomMax: 4,
-    pickupsPerRoom: 2,
-    enemyHealth: 1, chaserMoveInterval: 3,
-    rangerFireInterval: 7, rangerShotSpeed: 1,
-    bossHealth: 3, bossFireInterval: 7, bossMoveInterval: 4, bossShotSpeed: 1,
-    calmDuration: 6,
+    roomCountMin: 4, roomCountMax: 6,
+    enemiesPerRoomMin: 1, enemiesPerRoomMax: 3,
+    pickupsPerRoom: 3,
+    enemyHealth: 1, chaserMoveInterval: 4,
+    rangerFireInterval: 8, rangerShotSpeed: 1,
+    bossHealth: 3, bossFireInterval: 8, bossMoveInterval: 5, bossShotSpeed: 1,
+    bossPauseCycle: 2, bossPauseDuration: 12,
+    calmDuration: 7,
   },
   normal: {
     label: "Normal",
@@ -153,6 +156,7 @@ export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
     enemyHealth: 1, chaserMoveInterval: 2,
     rangerFireInterval: 6, rangerShotSpeed: 1,
     bossHealth: 6, bossFireInterval: 5, bossMoveInterval: 3, bossShotSpeed: 1,
+    bossPauseCycle: 4, bossPauseDuration: 8,
     calmDuration: 6,
   },
   hard: {
@@ -164,6 +168,7 @@ export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
     enemyHealth: 2, chaserMoveInterval: 1,
     rangerFireInterval: 5, rangerShotSpeed: 1,
     bossHealth: 8, bossFireInterval: 4, bossMoveInterval: 2, bossShotSpeed: 2,
+    bossPauseCycle: 5, bossPauseDuration: 6,
     calmDuration: 5,
   },
   nightmare: {
@@ -175,6 +180,7 @@ export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
     enemyHealth: 2, chaserMoveInterval: 1,
     rangerFireInterval: 5, rangerShotSpeed: 2,
     bossHealth: 7, bossFireInterval: 5, bossMoveInterval: 2, bossShotSpeed: 2,
+    bossPauseCycle: 6, bossPauseDuration: 5,
     calmDuration: 4,
   },
 };

@@ -465,6 +465,15 @@ export class DungeonCrawlerScene implements Scene {
   private updateBossAI(enemy: Enemy): void {
     enemy.shootCooldown--;
     if (enemy.shootCooldown > 0) return;
+
+    // Periodic pause: after N shots, take a breather
+    enemy.stateTimer++;
+    if (enemy.stateTimer >= this.difficultyConfig.bossPauseCycle) {
+      enemy.stateTimer = 0;
+      enemy.shootCooldown = this.difficultyConfig.bossPauseDuration;
+      return;
+    }
+
     enemy.shootCooldown = this.difficultyConfig.bossFireInterval;
 
     let bestDir: Direction = "down";
@@ -858,18 +867,19 @@ export class DungeonCrawlerScene implements Scene {
       );
     }
 
-    // Boss HP hearts (bottom-center, only in boss room with active boss)
+    // Boss HP display (top-center, inside playable area)
     const boss = this.room.enemies.find((e) => e.type === "boss" && e.state === "active");
     if (boss) {
       const cx = CANVAS_WIDTH / 2;
-      const heartsY = CANVAS_HEIGHT - 32;
+      const titleY = CELL_SIZE + 4;
+      const heartsY = titleY + 16;
       const colorIdx = Math.floor(this.tickCount / 3) % RAINBOW_COLORS.length;
       const effectiveMax = this.getBossEffectiveMaxHealth();
       const threshold = boss.maxHealth - effectiveMax;
       const effectiveHealth = Math.max(0, boss.health - threshold);
 
       // Title
-      renderer.drawText("Corrupted Troll", cx, heartsY - 20, {
+      renderer.drawText("Corrupted Troll", cx, titleY, {
         fontSize: 13, color: 0xff8866, anchor: 0.5,
       });
 
@@ -882,20 +892,17 @@ export class DungeonCrawlerScene implements Scene {
       for (let i = 0; i < boss.maxHealth; i++) {
         const hx = hStartX + i * heartSpacing;
         if (i >= effectiveMax) {
-          // Depleted by rainbow power — show empty heart, dimmed
           renderer.drawSpritePixel(hx, heartsY, tex.ui.heartEmpty, heartSize, 0.3);
         } else if (i < effectiveHealth) {
-          // Full heart — active HP
           renderer.drawSpritePixel(hx, heartsY, tex.ui.heartFull, heartSize);
         } else {
-          // Damaged — show empty/hollow heart
           renderer.drawSpritePixel(hx, heartsY, tex.ui.heartEmpty, heartSize);
         }
       }
 
       // Boss weakened popup
       if (this.bossWeakenedPopupTimer > 0) {
-        const popupY = heartsY - 38 - (20 - this.bossWeakenedPopupTimer) * 0.5;
+        const popupY = titleY - 18 - (20 - this.bossWeakenedPopupTimer) * 0.5;
         renderer.drawText("Rainbow Power weakened the boss!", cx, popupY, {
           fontSize: 12, color: RAINBOW_COLORS[colorIdx], anchor: 0.5,
         });
