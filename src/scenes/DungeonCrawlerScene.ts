@@ -660,7 +660,8 @@ export class DungeonCrawlerScene implements Scene {
 
   private renderRoom(renderer: Renderer): void {
     const tiles = this.textures.tiles;
-    const cleared = this.room.cleared && this.state === "playing";
+    const isFirstRoom = this.dungeon.currentRoom === 0;
+    const cleared = this.room.cleared && !isFirstRoom && (this.state === "playing" || this.state === "win");
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
         const cell = this.room.grid[y][x];
