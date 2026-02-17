@@ -3,6 +3,7 @@ import {
   rng,
   doorPos,
   DELTA,
+  DIRECTIONS,
   OPPOSITE_DIR,
   GNOLL_VARIANTS,
   ELF_GENDERS,
@@ -21,20 +22,18 @@ import type {
 
 export function generateDungeon(config: DifficultyConfig): Dungeon {
   const numRooms = rng.nextInt(config.roomCountMin, config.roomCountMax);
-  const dirs: Direction[] = ["up", "down", "left", "right"];
 
   interface RoomNode {
-    id: number;
     connections: Map<Direction, number>;
   }
 
   const nodes: RoomNode[] = [];
   for (let i = 0; i < numRooms; i++) {
-    nodes.push({ id: i, connections: new Map() });
+    nodes.push({ connections: new Map() });
   }
 
   for (let i = 0; i < numRooms - 1; i++) {
-    const availDirs = dirs.filter((d) => !nodes[i].connections.has(d));
+    const availDirs = DIRECTIONS.filter((d) => !nodes[i].connections.has(d));
     if (availDirs.length === 0) break;
     rng.shuffle(availDirs);
     const dir = availDirs[0];
@@ -163,26 +162,7 @@ function generateRoom(
       carveCorridor(grid, door, dir, startX, startY, startX + areaW - 1, startY + areaH - 1);
     }
 
-    const centerX = Math.floor(GRID_SIZE / 2);
-    const centerY = Math.floor(GRID_SIZE / 2);
-    let seedCell: Point | null = null;
-    for (let r = 0; r < GRID_SIZE; r++) {
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          const cx = centerX + dx;
-          const cy = centerY + dy;
-          if (cx >= 0 && cx < GRID_SIZE && cy >= 0 && cy < GRID_SIZE) {
-            if (grid[cy][cx] === "floor" || grid[cy][cx] === "door") {
-              seedCell = { x: cx, y: cy };
-            }
-          }
-          if (seedCell) break;
-        }
-        if (seedCell) break;
-      }
-      if (seedCell) break;
-    }
-
+    const seedCell = findNearestWalkable(grid);
     if (!seedCell) continue;
 
     const reachable = floodFill(grid, seedCell);
@@ -204,7 +184,7 @@ function generateRoom(
         pickups: [],
         connections,
         cleared: false,
-        playerSpawn: { x: centerX, y: centerY },
+        playerSpawn: { x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) },
       };
     }
   }
@@ -342,12 +322,12 @@ function placePickups(
   for (let i = 0; i < count; i++) {
     const pos = pickSpawnPos(floorCells, room);
     if (pos) {
-      room.pickups.push({ pos, type: "health", collected: false });
+      room.pickups.push({ pos, collected: false });
     }
   }
 }
 
-function findPlayerSpawn(room: Room): Point {
+function findNearestWalkable(grid: CellType[][]): Point | null {
   const cx = Math.floor(GRID_SIZE / 2);
   const cy = Math.floor(GRID_SIZE / 2);
   for (let r = 0; r < GRID_SIZE; r++) {
@@ -356,18 +336,24 @@ function findPlayerSpawn(room: Room): Point {
         const x = cx + dx;
         const y = cy + dy;
         if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-          if (room.grid[y][x] === "floor") {
+          if (grid[y][x] === "floor" || grid[y][x] === "door") {
             return { x, y };
           }
         }
       }
     }
   }
-  // Fallback: find any floor cell in the room
+  return null;
+}
+
+function findPlayerSpawn(room: Room): Point {
+  const found = findNearestWalkable(room.grid);
+  if (found && room.grid[found.y][found.x] === "floor") return found;
+  // Fallback: find any floor cell
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
       if (room.grid[y][x] === "floor") return { x, y };
     }
   }
-  return { x: cx, y: cy };
+  return { x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) };
 }

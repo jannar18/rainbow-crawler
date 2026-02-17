@@ -12,6 +12,7 @@ const GAME_KEYS = new Set([
   "Space",
   "ShiftLeft",
   "ShiftRight",
+  "Tab",
 ]);
 
 export class Input {

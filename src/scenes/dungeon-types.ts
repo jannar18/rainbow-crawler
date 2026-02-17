@@ -35,6 +35,7 @@ export interface Point {
 }
 
 export type Direction = "up" | "down" | "left" | "right";
+export const DIRECTIONS: Direction[] = ["up", "down", "left", "right"];
 export type CellType = "wall" | "floor" | "door";
 export type GameState = "start" | "playing" | "gameOver" | "win";
 export type EnemyType = "chaser" | "ranger" | "boss";
@@ -63,8 +64,8 @@ export interface Enemy {
   moveCooldown: number;
   shootCooldown: number;
   maxHealth: number;
-  gnollVariant: string; // chaser: which gnoll skin
-  healedGender: string; // chaser: which elf gender when healed
+  gnollVariant: typeof GNOLL_VARIANTS[number] | "";
+  healedGender: typeof ELF_GENDERS[number] | "";
 }
 
 export interface Projectile {
@@ -76,7 +77,6 @@ export interface Projectile {
 
 export interface Pickup {
   pos: Point;
-  type: "health";
   collected: boolean;
 }
 
@@ -103,7 +103,6 @@ export type NightmareModifier = "noPickups" | "doubleBoss" | "swarm" | "fastShot
 
 export interface DifficultyConfig {
   label: string;
-  difficulty: Difficulty;
   roomCountMin: number;
   roomCountMax: number;
   enemiesPerRoomMin: number;
@@ -136,7 +135,7 @@ export const NIGHTMARE_MODIFIER_LABELS: Record<NightmareModifier, string> = {
 export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
   easy: {
     label: "Easy",
-    difficulty: "easy",
+
     roomCountMin: 5, roomCountMax: 7,
     enemiesPerRoomMin: 2, enemiesPerRoomMax: 4,
     pickupsPerRoom: 2,
@@ -147,7 +146,7 @@ export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
   },
   normal: {
     label: "Normal",
-    difficulty: "normal",
+
     roomCountMin: 6, roomCountMax: 8,
     enemiesPerRoomMin: 3, enemiesPerRoomMax: 5,
     pickupsPerRoom: 1,
@@ -158,7 +157,7 @@ export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
   },
   hard: {
     label: "Hard",
-    difficulty: "hard",
+
     roomCountMin: 7, roomCountMax: 9,
     enemiesPerRoomMin: 4, enemiesPerRoomMax: 6,
     pickupsPerRoom: 1,
@@ -169,7 +168,7 @@ export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
   },
   nightmare: {
     label: "Nightmare",
-    difficulty: "nightmare",
+
     roomCountMin: 8, roomCountMax: 10,
     enemiesPerRoomMin: 5, enemiesPerRoomMax: 7,
     pickupsPerRoom: 0,
