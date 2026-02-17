@@ -154,7 +154,7 @@ export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
     roomCountMin: 6, roomCountMax: 8,
     enemiesPerRoomMin: 3, enemiesPerRoomMax: 5,
     pickupsPerRoom: 1,
-    enemyHealth: 1, chaserMoveInterval: 2,
+    enemyHealth: 1, chaserMoveInterval: 3,
     rangerFireInterval: 6, rangerShotSpeed: 1,
     bossHealth: 6, bossFireInterval: 5, bossMoveInterval: 3, bossShotSpeed: 1,
     bossPauseCycle: 4, bossPauseDuration: 8,
